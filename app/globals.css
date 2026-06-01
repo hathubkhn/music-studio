@@ -1,26 +1,187 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+/* ─── Artlist-inspired dark theme ─── */
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* Dark-first design — matches Artlist's near-black studio aesthetic */
+    --background: 240 14% 5%;          /* #09090F deep near-black */
+    --foreground: 0 0% 97%;             /* #F7F7F7 pure near-white */
+    --card: 240 12% 8%;                 /* #111119 dark card */
+    --card-foreground: 0 0% 97%;
+    --popover: 240 12% 8%;
+    --popover-foreground: 0 0% 97%;
+    --primary: 174 94% 52%;             /* #04EBCF electric teal — Artlist accent */
+    --primary-foreground: 240 14% 5%;   /* dark text on teal buttons */
+    --secondary: 240 10% 14%;           /* #1A1A26 */
+    --secondary-foreground: 0 0% 85%;
+    --muted: 240 10% 12%;               /* #161622 */
+    --muted-foreground: 240 5% 52%;     /* #7E7E90 */
+    --accent: 240 10% 14%;
+    --accent-foreground: 0 0% 95%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 8% 17%;               /* #24242F subtle borders */
+    --input: 240 8% 13%;                /* #181824 input backgrounds */
+    --ring: 174 94% 52%;                /* matches primary teal */
+    --radius: 0.75rem;
+    --chart-1: 174 94% 52%;            /* teal */
+    --chart-2: 260 80% 65%;            /* purple */
+    --chart-3: 200 85% 60%;            /* sky blue */
+    --chart-4: 38 92% 60%;             /* amber */
+    --chart-5: 142 70% 50%;            /* green */
+  }
+
+  /* Light theme kept minimal — app is dark-first */
+  .light {
+    --background: 0 0% 100%;
+    --foreground: 240 14% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 14% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 14% 8%;
+    --primary: 174 80% 38%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 94%;
+    --secondary-foreground: 240 10% 20%;
+    --muted: 240 5% 94%;
+    --muted-foreground: 240 5% 48%;
+    --accent: 240 5% 94%;
+    --accent-foreground: 240 10% 20%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5% 88%;
+    --input: 240 5% 88%;
+    --ring: 174 80% 38%;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  /* Artlist-style scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+}
+
+@layer utilities {
+  /* Electric teal gradient — Artlist primary CTA style */
+  .gradient-brand {
+    background: linear-gradient(135deg, hsl(174 94% 52%) 0%, hsl(200 90% 55%) 100%);
+  }
+
+  /* Purple → Teal hero gradient — Artlist hero section */
+  .gradient-hero {
+    background: linear-gradient(135deg, hsl(260 80% 65%) 0%, hsl(174 94% 52%) 100%);
+  }
+
+  /* Subtle brand tint for card backgrounds */
+  .gradient-brand-soft {
+    background: linear-gradient(135deg, hsl(174 94% 52% / 0.08) 0%, hsl(260 80% 65% / 0.08) 100%);
+  }
+
+  /* Gradient text — electric teal to purple */
+  .text-gradient {
+    background: linear-gradient(135deg, hsl(174 94% 52%) 0%, hsl(200 88% 62%) 40%, hsl(260 80% 70%) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Hero background glow effect */
+  .glow-teal {
+    box-shadow: 0 0 60px hsl(174 94% 52% / 0.15), 0 0 120px hsl(174 94% 52% / 0.08);
+  }
+  .glow-teal-sm {
+    box-shadow: 0 0 20px hsl(174 94% 52% / 0.25);
+  }
+
+  /* Dark glass card — Artlist card style */
+  .glass {
+    background: hsl(240 12% 8% / 0.8);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid hsl(240 8% 17%);
+  }
+
+  /* Studio dot grid background */
+  .bg-grid {
+    background-image:
+      radial-gradient(circle, hsl(174 94% 52% / 0.06) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  /* Noise texture overlay for depth */
+  .bg-noise {
+    position: relative;
+  }
+  .bg-noise::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    border-radius: inherit;
+  }
+
+  /* Teal glow ring on focus */
+  .ring-teal {
+    --tw-ring-color: hsl(174 94% 52% / 0.4);
+  }
+
+  /* Artlist waveform animation bar */
+  .wave-bar {
+    animation: wave 1.4s ease-in-out infinite;
+    transform-origin: bottom;
+  }
+  .wave-bar:nth-child(2) { animation-delay: 0.1s; }
+  .wave-bar:nth-child(3) { animation-delay: 0.2s; }
+  .wave-bar:nth-child(4) { animation-delay: 0.3s; }
+  .wave-bar:nth-child(5) { animation-delay: 0.4s; }
+}
+
+@keyframes wave {
+  0%, 100% { transform: scaleY(0.4); }
+  50%       { transform: scaleY(1); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 hsl(174 94% 52% / 0.4); }
+  50%       { box-shadow: 0 0 0 8px hsl(174 94% 52% / 0); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }

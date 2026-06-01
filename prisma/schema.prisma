@@ -1,0 +1,258 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projects Project[]
+  albums   Album[]
+}
+
+// ── Album (multi-track collection for long-form video) ───────────────────────
+
+model Album {
+  id          String      @id @default(cuid())
+  userId      String
+  title       String
+  theme       String?     @db.Text
+  genre       String?
+  mood        String?
+  language    String      @default("en")
+  stylePrompt String?     @db.Text
+  coverImageUrl String?
+  status      AlbumStatus @default(DRAFT)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tracks AlbumTrack[]
+}
+
+enum AlbumStatus {
+  DRAFT
+  GENERATING
+  COMPLETED
+}
+
+model AlbumTrack {
+  id          String      @id @default(cuid())
+  albumId     String
+  order       Int
+  title       String
+  description String?     @db.Text
+  lyrics      String?     @db.Text
+  stylePrompt String?     @db.Text
+  audioUrl    String?
+  audioJobId  String?
+  duration    Float?
+  status      TrackStatus @default(PENDING)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  album Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+}
+
+enum TrackStatus {
+  PENDING
+  GENERATING
+  COMPLETED
+  FAILED
+}
+
+model Project {
+  id             String        @id @default(cuid())
+  userId         String
+  title          String
+  originalPrompt String        @db.Text
+  targetLanguage String        @default("en")
+  audience       String?
+  mood           String?
+  genre          String?
+  vocalPreference String?
+  durationTarget String?
+  outputPurpose  String?
+  status         ProjectStatus @default(DRAFT)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  songBrief     SongBrief?
+  lyricsVersions LyricsVersion[]
+  scenes        Scene[]
+  generationJobs GenerationJob[]
+  mediaAssets   MediaAsset[]
+  costEvents    CostEvent[]
+}
+
+enum ProjectStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+model SongBrief {
+  id                String   @id @default(cuid())
+  projectId         String   @unique
+  concept           String   @db.Text
+  titleSuggestions  Json
+  structure         Json
+  recommendedStyle  String   @db.Text
+  visualDirection   String   @db.Text
+  lyricalTheme      String?  @db.Text
+  targetEmotion     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model LyricsVersion {
+  id              String   @id @default(cuid())
+  projectId       String
+  title           String
+  lyrics          String   @db.Text
+  stylePrompt     String   @db.Text
+  genre           String?
+  mood            String?
+  vocalStyle      String?
+  instrumentation String?
+  tempo           String?
+  negativePrompt  String?
+  language        String   @default("en")
+  isFinal         Boolean  @default(false)
+  version         Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model GenerationJob {
+  id              String    @id @default(cuid())
+  projectId       String
+  type            JobType
+  provider        String    @default("kie")
+  model           String?
+  status          JobStatus @default(QUEUED)
+  requestPayload  Json?
+  responsePayload Json?
+  externalTaskId  String?
+  costEstimate    Float?
+  actualCost      Float?
+  errorMessage    String?   @db.Text
+  retryCount      Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  completedAt     DateTime?
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  mediaAssets MediaAsset[]
+  costEvents  CostEvent[]
+}
+
+enum JobType {
+  LYRICS
+  MUSIC
+  IMAGE
+  VIDEO
+  ASSET_PACK
+  SCENE_PROMPTS
+  SONG_BRIEF
+}
+
+enum JobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model MediaAsset {
+  id        String     @id @default(cuid())
+  projectId String
+  jobId     String?
+  type      AssetType
+  url       String
+  filename  String
+  mimeType  String?
+  size      Int?
+  duration  Float?
+  width     Int?
+  height    Int?
+  metadata  Json?
+  isFinal   Boolean    @default(false)
+  createdAt DateTime   @default(now())
+
+  project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  job     GenerationJob? @relation(fields: [jobId], references: [id])
+  scenes  Scene[]        @relation("SceneSelectedAsset")
+}
+
+enum AssetType {
+  AUDIO
+  IMAGE
+  VIDEO
+  TEXT
+  ZIP
+}
+
+model Scene {
+  id              String      @id @default(cuid())
+  projectId       String
+  order           Int
+  lyricExcerpt    String      @db.Text
+  description     String?     @db.Text
+  prompt          String?     @db.Text
+  negativePrompt  String?     @db.Text
+  aspectRatio     String      @default("16:9")
+  style           String?
+  textOverlay     String?
+  composition     String?
+  status          SceneStatus @default(PENDING)
+  selectedAssetId String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  selectedAsset MediaAsset? @relation("SceneSelectedAsset", fields: [selectedAssetId], references: [id])
+}
+
+enum SceneStatus {
+  PENDING
+  GENERATING
+  COMPLETED
+  FAILED
+}
+
+model CostEvent {
+  id            String   @id @default(cuid())
+  projectId     String
+  jobId         String?
+  provider      String
+  model         String
+  operationType String
+  unit          String
+  quantity      Float
+  estimatedCost Float
+  actualCost    Float?
+  currency      String   @default("USD")
+  createdAt     DateTime @default(now())
+
+  project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  job     GenerationJob? @relation(fields: [jobId], references: [id])
+}
