@@ -1,7 +1,6 @@
 "use client"
 
 import { upload } from "@vercel/blob/client"
-// @vercel/blob/client works in both browser and server contexts
 
 const AUDIO_EXTENSIONS = ["mp3", "mp4", "wav", "m4a", "ogg", "flac", "aac", "webm"]
 
@@ -10,10 +9,15 @@ export interface AudioUploadResult {
   fileName: string
 }
 
+/** Generate a short random hex string usable in a pathname. */
+function shortId(): string {
+  return Math.random().toString(36).slice(2, 10)
+}
+
 /**
  * Upload an audio file directly from the browser to Vercel Blob.
- * The file bytes bypass the Next.js serverless function (no 4.5 MB limit).
- * Returns a publicly accessible URL that Kie.ai can reach.
+ * File bytes go browser → Vercel Blob edge (bypasses the 4.5 MB function limit).
+ * Each upload gets a unique pathname so it never collides with existing blobs.
  */
 export async function uploadAudio(
   file: File,
@@ -28,12 +32,12 @@ export async function uploadAudio(
     throw new Error("File too large — max 200 MB")
   }
 
-  // Sanitise filename: keep extension, replace unicode / special chars
-  const safeName = `audio-upload.${ext}`
+  // Unique path per upload — prevents "blob already exists" 400 error
+  const uniquePath = `audio-uploads/${Date.now()}-${shortId()}.${ext}`
 
-  const blob = await upload(safeName, file, {
-    access:          "public",
-    handleUploadUrl: "/api/upload/audio",
+  const blob = await upload(uniquePath, file, {
+    access:           "public",
+    handleUploadUrl:  "/api/upload/audio",
     onUploadProgress: ({ percentage }) => onProgress?.(percentage),
   })
 
