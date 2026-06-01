@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import {
   Headphones, Loader2, ChevronLeft, Play, Pause,
   Download, RotateCcw, CheckCircle2, AlertCircle, Clock, Sparkles, Pencil
@@ -41,6 +41,9 @@ export function Step3GenerateMusic({ data, onNext, onBack }: Props) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [progress, setProgress] = useState(0)
   const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  // Timestamp when generation started (for timeout detection)
+  const genStartRef = React.useRef<number | null>(null)
 
   // Editable fields — user can adjust before generating
   const [localTitle, setLocalTitle]           = useState(data.title || "")
@@ -57,7 +60,19 @@ export function Step3GenerateMusic({ data, onNext, onBack }: Props) {
   useEffect(() => {
     if (!jobId || status === "completed" || status === "failed") return
 
+    const TIMEOUT_MS = 5 * 60 * 1000  // 5-minute hard timeout
+    if (!genStartRef.current) genStartRef.current = Date.now()
+
     const interval = setInterval(async () => {
+      // Hard timeout guard — Kie.ai sometimes gets stuck without ever failing
+      if (Date.now() - (genStartRef.current ?? 0) > TIMEOUT_MS) {
+        clearInterval(interval)
+        setStatus("failed")
+        setErrorMessage("Generation timed out after 5 minutes. Please try again.")
+        toast.error("Generation timed out")
+        return
+      }
+
       try {
         const res = await fetch(`/api/kie/suno/status?jobId=${jobId}`)
         const result = await res.json()
@@ -68,20 +83,24 @@ export function Step3GenerateMusic({ data, onNext, onBack }: Props) {
           setAudioId(result.result[0].id ?? null)
           setAudioDuration(result.result[0].duration ?? null)
           setProgress(100)
+          setErrorMessage(null)
           clearInterval(interval)
           toast.success("Music generated successfully!")
-        } else if (result.status === "failed") {
+        } else if (result.status === "failed" || result.error) {
+          // Catch both explicit "failed" status AND error messages during "processing"
+          // (e.g. Kie.ai copyright rejection: "This audio matches an existing recording")
           setStatus("failed")
+          setErrorMessage(result.error || "Generation failed")
           clearInterval(interval)
-          toast.error("Music generation failed")
+          toast.error(result.error || "Music generation failed")
         } else {
           setStatus("processing")
-          setProgress((p) => Math.min(p + 15, 90))
+          setProgress((p) => Math.min(p + 8, 90))
         }
       } catch {
-        // continue polling
+        // network error — keep polling, timeout will eventually catch it
       }
-    }, 3000)
+    }, 4000)
 
     return () => clearInterval(interval)
   }, [jobId, status])
@@ -93,6 +112,8 @@ export function Step3GenerateMusic({ data, onNext, onBack }: Props) {
   async function generateMusic() {
     setStatus("queued")
     setProgress(5)
+    setErrorMessage(null)
+    genStartRef.current = Date.now()
     try {
       let endpoint: string
       let body: Record<string, unknown>
@@ -321,13 +342,21 @@ export function Step3GenerateMusic({ data, onNext, onBack }: Props) {
 
       {status === "failed" && (
         <Card className="border-destructive/30 bg-destructive/5">
-          <CardContent className="p-4 flex items-center gap-3">
-            <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
-            <div>
+          <CardContent className="p-4 flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
               <p className="font-medium text-sm">Generation failed</p>
-              <p className="text-xs text-muted-foreground">Please try again or check your API configuration</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {errorMessage ?? "Please try again or check your API configuration"}
+              </p>
+              {errorMessage?.toLowerCase().includes("matches an existing recording") && (
+                <p className="text-xs text-amber-400 mt-1">
+                  Kie.ai blocked this audio because it matches a copyrighted recording in their catalog.
+                  Try uploading a different reference audio or switching to a regular generate without cover mode.
+                </p>
+              )}
             </div>
-            <Button variant="outline" size="sm" onClick={generateMusic} className="ml-auto gap-1.5">
+            <Button variant="outline" size="sm" onClick={generateMusic} className="ml-auto gap-1.5 shrink-0">
               <RotateCcw className="h-3.5 w-3.5" />
               Retry
             </Button>

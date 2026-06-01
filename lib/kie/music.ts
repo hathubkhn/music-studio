@@ -234,6 +234,13 @@ export async function getMusicStatus(taskId: string): Promise<TaskStatusResponse
       status = "processing"
   }
 
+  // If Kie returns an error message but no tracks and status is still "processing",
+  // treat it as failed so the UI doesn't poll forever (e.g. copyright rejection,
+  // "This audio matches an existing recording in our catalog.").
+  if (data.errorMessage && tracks.length === 0 && status === "processing") {
+    status = "failed"
+  }
+
   return {
     taskId: data.taskId,
     status,
