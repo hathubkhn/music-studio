@@ -1,11 +1,11 @@
 "use client"
 
-import { Sparkles, FolderOpen, Check, ArrowRight, Music2 } from "lucide-react"
+import { Sparkles, FolderOpen, Check, ArrowRight, Music2, Shuffle } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
-export type FlowMode = "scratch" | "import" | "style-copy"
+export type FlowMode = "scratch" | "import" | "style-copy" | "mashup"
 
 interface Props {
   onSelect: (mode: FlowMode) => void
@@ -32,6 +32,13 @@ const STYLE_COPY_FEATURES = [
   "AI generates music matching the reference vibe",
 ]
 
+const MASHUP_FEATURES = [
+  "Upload two reference songs (MP3 / WAV / OGG …)",
+  "AI blends both styles and melodies together",
+  "Add your own lyrics or let AI write them",
+  "Control blend strength, style weight & weirdness",
+]
+
 export function ModeSelector({ onSelect }: Props) {
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-fade-in py-6">
@@ -42,7 +49,7 @@ export function ModeSelector({ onSelect }: Props) {
         </p>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-5">
+      <div className="grid md:grid-cols-2 gap-5">
         {/* From Scratch */}
         <Card
           className="cursor-pointer group border-border/60 hover:border-teal-500/40 transition-all duration-200 hover:shadow-xl hover:shadow-teal-500/5"
@@ -161,6 +168,48 @@ export function ModeSelector({ onSelect }: Props) {
             >
               <Music2 className="w-4 h-4 mr-2" />
               Copy a Style
+              <ArrowRight className="w-4 h-4 ml-auto" />
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Mashup */}
+        <Card
+          className="cursor-pointer group border-border/60 hover:border-pink-500/40 transition-all duration-200 hover:shadow-xl hover:shadow-pink-500/5"
+          onClick={() => onSelect("mashup")}
+        >
+          <CardContent className="p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="w-12 h-12 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center group-hover:bg-pink-500/20 transition-colors">
+                <Shuffle className="w-6 h-6 text-pink-400" />
+              </div>
+              <Badge variant="outline" className="border-pink-500/30 text-pink-400 text-xs">
+                Mashup
+              </Badge>
+            </div>
+
+            <div>
+              <h2 className="text-lg font-bold mb-1">Mashup Two Songs</h2>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                Blend two reference tracks into one brand-new AI-generated mashup.
+              </p>
+            </div>
+
+            <ul className="space-y-1.5">
+              {MASHUP_FEATURES.map((f) => (
+                <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <Check className="w-3.5 h-3.5 text-pink-400 mt-0.5 shrink-0" />
+                  {f}
+                </li>
+              ))}
+            </ul>
+
+            <Button
+              variant="outline"
+              className="w-full border-pink-500/30 text-pink-300 hover:bg-pink-500/10 font-semibold group-hover:border-pink-500/50"
+            >
+              <Shuffle className="w-4 h-4 mr-2" />
+              Create Mashup
               <ArrowRight className="w-4 h-4 ml-auto" />
             </Button>
           </CardContent>

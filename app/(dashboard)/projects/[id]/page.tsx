@@ -2,7 +2,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import {
   ArrowLeft, Music2, Image as ImageIcon, Video,
-  Download, Edit3, Clock, DollarSign, FileText, CheckCircle2,
+  Download, Edit3, Clock, DollarSign, FileText, CheckCircle2, Languages,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { prisma } from "@/lib/db"
 import { formatDistanceToNow } from "date-fns"
+import { SongTranslator } from "@/components/music/song-translator"
 
 export const dynamic = "force-dynamic"
 
@@ -44,6 +45,12 @@ export default async function ProjectDetailPage({
   const imageAssets  = project.mediaAssets.filter((a) => a.type === "IMAGE")
   const videoAsset   = project.mediaAssets.find((a) => a.type === "VIDEO")
   const completedScenes = project.scenes.filter((s) => s.status === "COMPLETED")
+
+  // Kie track-level IDs stored in MediaAsset.metadata (added when generating)
+  const audioMeta = audioAsset?.metadata as { audioId?: string; duration?: number } | null ?? null
+  const musicTaskId  = project.generationJobs.find((j) => j.type === "MUSIC")?.externalTaskId ?? null
+  const musicAudioId = audioMeta?.audioId ?? null
+  const musicDuration = audioMeta?.duration ?? undefined
 
   return (
     <div className="space-y-6 animate-fade-in max-w-5xl">
@@ -133,6 +140,11 @@ export default async function ProjectDetailPage({
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="lyrics">Lyrics</TabsTrigger>
           <TabsTrigger value="images">Images ({completedScenes.length})</TabsTrigger>
+          {audioAsset && finalLyrics && (
+            <TabsTrigger value="translate" className="gap-1.5">
+              <Languages className="h-3.5 w-3.5" />Translate
+            </TabsTrigger>
+          )}
           <TabsTrigger value="jobs">Jobs ({project.generationJobs.length})</TabsTrigger>
         </TabsList>
 
@@ -298,6 +310,21 @@ export default async function ProjectDetailPage({
             </Card>
           )}
         </TabsContent>
+
+        {/* Translate */}
+        {audioAsset && finalLyrics && (
+          <TabsContent value="translate" className="mt-4">
+            <SongTranslator
+              taskId={musicTaskId}
+              audioId={musicAudioId}
+              audioUrl={audioAsset.url}
+              durationS={musicDuration}
+              lyrics={finalLyrics.lyrics}
+              stylePrompt={finalLyrics.stylePrompt ?? ""}
+              title={project.title}
+            />
+          </TabsContent>
+        )}
 
         {/* Jobs */}
         <TabsContent value="jobs" className="mt-4">

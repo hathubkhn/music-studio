@@ -72,6 +72,9 @@ const updateSchema = z.object({
     url:      z.string(),
     filename: z.string().optional(),
     isFinal:  z.boolean().optional().default(true),
+    // Kie track-level ID + duration for replace-section / translate
+    audioId:  z.string().optional(),
+    duration: z.number().optional(),
   }).optional(),
 
   // Scenes (full replace)
@@ -176,6 +179,11 @@ export async function PATCH(
           filename:  input.audioUrl.filename ?? "audio.mp3",
           mimeType:  "audio/mpeg",
           isFinal:   input.audioUrl.isFinal ?? true,
+          // Store Kie track ID + duration so translate/replace-section features work
+          ...(input.audioUrl.audioId || input.audioUrl.duration
+            ? { metadata: { audioId: input.audioUrl.audioId, duration: input.audioUrl.duration } }
+            : {}
+          ),
         },
       })
     }

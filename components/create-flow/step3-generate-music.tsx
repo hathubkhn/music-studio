@@ -35,6 +35,9 @@ export function Step3GenerateMusic({ data, onNext, onBack }: Props) {
   const [status, setStatus] = useState<JobStatus>("idle")
   const [jobId, setJobId] = useState<string | null>(data.musicJobId || null)
   const [audioUrl, setAudioUrl] = useState<string | null>(data.audioUrl || null)
+  // Store Kie track-level ID and duration for replace-section / translate features
+  const [audioId, setAudioId]       = useState<string | null>(data.musicAudioId || null)
+  const [audioDuration, setAudioDuration] = useState<number | null>(data.musicDuration || null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [progress, setProgress] = useState(0)
   const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null)
@@ -62,6 +65,8 @@ export function Step3GenerateMusic({ data, onNext, onBack }: Props) {
         if (result.status === "completed" && result.result?.[0]?.url) {
           setStatus("completed")
           setAudioUrl(result.result[0].url)
+          setAudioId(result.result[0].id ?? null)
+          setAudioDuration(result.result[0].duration ?? null)
           setProgress(100)
           clearInterval(interval)
           toast.success("Music generated successfully!")
@@ -81,29 +86,49 @@ export function Step3GenerateMusic({ data, onNext, onBack }: Props) {
     return () => clearInterval(interval)
   }, [jobId, status])
 
-  // Cover mode: use the upload-cover endpoint when a reference URL is provided
-  const isCoverMode = Boolean(data.referenceAudioUrl)
+  // Detect generation mode
+  const isCoverMode  = Boolean(data.referenceAudioUrl)
+  const isMashupMode = Boolean(data.mashupAudio1Url && data.mashupAudio2Url)
 
   async function generateMusic() {
     setStatus("queued")
     setProgress(5)
     try {
-      const endpoint = isCoverMode ? "/api/kie/suno/cover" : "/api/kie/suno/create"
-      const body = isCoverMode
-        ? {
-            uploadUrl:   data.referenceAudioUrl,
-            title:       localTitle || data.title,
-            lyrics:      data.lyrics,
-            stylePrompt: localStylePrompt,
-            audioWeight: data.audioWeight,
-            styleWeight: data.styleWeight,
-            vocalGender: data.vocalGender,
-          }
-        : {
-            title:       localTitle || data.title,
-            lyrics:      data.lyrics,
-            stylePrompt: localStylePrompt,
-          }
+      let endpoint: string
+      let body: Record<string, unknown>
+
+      if (isMashupMode) {
+        endpoint = "/api/kie/suno/mashup"
+        body = {
+          uploadUrl:           data.mashupAudio1Url,
+          uploadUrl2:          data.mashupAudio2Url,
+          title:               localTitle || data.title,
+          lyrics:              data.lyrics,
+          stylePrompt:         localStylePrompt,
+          audioWeight:         data.audioWeight,
+          styleWeight:         data.styleWeight,
+          weirdnessConstraint: data.weirdnessConstraint,
+          vocalGender:         data.vocalGender,
+        }
+      } else if (isCoverMode) {
+        endpoint = "/api/kie/suno/cover"
+        body = {
+          uploadUrl:   data.referenceAudioUrl,
+          title:       localTitle || data.title,
+          lyrics:      data.lyrics,
+          stylePrompt: localStylePrompt,
+          audioWeight: data.audioWeight,
+          styleWeight: data.styleWeight,
+          vocalGender: data.vocalGender,
+        }
+      } else {
+        endpoint = "/api/kie/suno/create"
+        body = {
+          title:       localTitle || data.title,
+          lyrics:      data.lyrics,
+          stylePrompt: localStylePrompt,
+        }
+      }
 
       const res = await fetch(endpoint, {
         method: "POST",
@@ -120,7 +145,9 @@ export function Step3GenerateMusic({ data, onNext, onBack }: Props) {
       setStatus("processing")
       setProgress(20)
       toast.info(
-        isCoverMode
+        isMashupMode
+          ? "Mashup generation started — blending both tracks. This takes 1-3 min…"
+          : isCoverMode
           ? "Cover generation started — melody preserved, new lyrics incoming. This takes 1-3 min…"
           : "Music generation started. This takes 1-3 minutes..."
       )
@@ -356,11 +383,13 @@ export function Step3GenerateMusic({ data, onNext, onBack }: Props) {
               <Button
                 variant="gradient"
                 onClick={() => onNext({
-                  title:       localTitle || data.title,
-                  stylePrompt: localStylePrompt || data.stylePrompt,
-                  musicJobId:  jobId || undefined,
-                  audioUrl:    audioUrl || undefined,
-                  musicStatus: "completed",
+                  title:          localTitle || data.title,
+                  stylePrompt:    localStylePrompt || data.stylePrompt,
+                  musicJobId:     jobId || undefined,
+                  audioUrl:       audioUrl || undefined,
+                  musicStatus:    "completed",
+                  musicAudioId:   audioId || undefined,
+                  musicDuration:  audioDuration || undefined,
                 })}
                 className="gap-2"
               >

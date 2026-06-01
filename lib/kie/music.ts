@@ -3,6 +3,8 @@ import { mockGenerateMusic, mockGetMusicStatus } from "./mock"
 import type {
   MusicGenerationRequest,
   MusicCoverRequest,
+  MashupRequest,
+  ReplaceSectionRequest,
   MusicGenerationResponse,
   TaskStatusResponse,
   KieApiResponse,
@@ -100,6 +102,86 @@ export async function generateMusicCover(
 
   const response = await kieClient.post<KieApiResponse<KieMusicGenerateData>>(
     "/api/v1/generate/upload-cover",
+    kiePayload
+  )
+
+  return {
+    taskId: response.data!.taskId,
+    status: "queued",
+  }
+}
+
+/**
+ * Mashup: blend 2 reference audio tracks into a new song.
+ * Uses Kie.ai /api/v1/generate/mashup endpoint.
+ * Both uploadUrl and uploadUrl2 must be publicly accessible URLs.
+ */
+export async function generateMashup(
+  req: MashupRequest
+): Promise<MusicGenerationResponse> {
+  if (isMockMode()) {
+    return mockGenerateMusic({ title: req.title, lyrics: req.lyrics, stylePrompt: req.stylePrompt ?? "" })
+  }
+
+  const model = req.model || "V4_5"   // Mashup supports V4_5PLUS per Kie docs
+  const limits = getLimits(model)
+
+  // Title cap is 80 chars for all models on the mashup endpoint
+  const MASHUP_TITLE_MAX = 80
+
+  const kiePayload = {
+    uploadUrlList:        [req.uploadUrl, req.uploadUrl2],   // exactly 2 URLs as per Kie docs
+    prompt:               req.lyrics.slice(0, limits.prompt),
+    style:                (req.stylePrompt ?? "").slice(0, limits.style),
+    title:                req.title.slice(0, MASHUP_TITLE_MAX),
+    customMode:           true,
+    instrumental:         false,
+    model,
+    callBackUrl:          `${APP_URL}/api/kie/webhook`,
+    audioWeight:          req.audioWeight  ?? 0.5,
+    ...(req.styleWeight         !== undefined && { styleWeight:         req.styleWeight }),
+    ...(req.weirdnessConstraint !== undefined && { weirdnessConstraint: req.weirdnessConstraint }),
+    ...(req.vocalGender         !== undefined && { vocalGender:         req.vocalGender }),
+  }
+
+  const response = await kieClient.post<KieApiResponse<KieMusicGenerateData>>(
+    "/api/v1/generate/mashup",
+    kiePayload
+  )
+
+  return {
+    taskId: response.data!.taskId,
+    status: "queued",
+  }
+}
+
+/**
+ * Replace a time segment within an already-generated song with new lyrics.
+ * POST /api/v1/generate/replace-section
+ * Segment must be 6–60 s and ≤ 50% of total song duration.
+ */
+export async function replaceSection(
+  req: ReplaceSectionRequest
+): Promise<MusicGenerationResponse> {
+  if (isMockMode()) {
+    return mockGenerateMusic({ title: req.title, lyrics: req.prompt, stylePrompt: req.tags })
+  }
+
+  const kiePayload = {
+    taskId:       req.taskId,
+    audioId:      req.audioId,
+    prompt:       req.prompt,
+    tags:         req.tags,
+    title:        req.title,
+    infillStartS: Math.round(req.infillStartS * 100) / 100,
+    infillEndS:   Math.round(req.infillEndS   * 100) / 100,
+    fullLyrics:   req.fullLyrics,
+    ...(req.negativeTags && { negativeTags: req.negativeTags }),
+    callBackUrl:  req.callBackUrl ?? `${APP_URL}/api/kie/webhook`,
+  }
+
+  const response = await kieClient.post<KieApiResponse<KieMusicGenerateData>>(
+    "/api/v1/generate/replace-section",
     kiePayload
   )
 

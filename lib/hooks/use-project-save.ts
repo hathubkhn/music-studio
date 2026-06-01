@@ -77,9 +77,12 @@ export function useProjectSave() {
       const audioSrc = data.audioUrl || data.importedAudioUrl
       if (audioSrc && !audioSrc.startsWith("blob:")) {
         body.audioUrl = {
-          url:     audioSrc,
+          url:      audioSrc,
           filename: data.audioUrl ? "audio.mp3" : (data.importedAudioName ?? "audio.mp3"),
-          isFinal: true,
+          isFinal:  true,
+          // Store Kie track-level ID and duration for replace-section / translate features
+          ...(data.musicAudioId   && { audioId:  data.musicAudioId }),
+          ...(data.musicDuration  && { duration: data.musicDuration }),
         }
         body.status = "IN_PROGRESS"
       }

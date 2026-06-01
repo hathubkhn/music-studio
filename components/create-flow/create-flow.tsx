@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Music2, FileText, Image, Headphones, Package, Video, Palette, FolderOpen } from "lucide-react"
+import { Music2, FileText, Image, Headphones, Package, Video, Palette, FolderOpen, Shuffle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useProjectSave } from "@/lib/hooks/use-project-save"
 import { ModeSelector, type FlowMode } from "./mode-selector"
 import { StepImport } from "./step-import"
 import { StepStyleCopy } from "./step-style-copy"
+import { StepMashup } from "./step-mashup"
 import { Step1SongIdea } from "./step1-song-idea"
 import { Step2LyricsEditor } from "./step2-lyrics-editor"
 import { Step3GenerateMusic } from "./step3-generate-music"
@@ -67,6 +68,13 @@ export type ProjectData = {
   audioWeight?: number   // 0–1: how strongly to follow source melody (default 0.8)
   styleWeight?: number   // 0–1: how strongly to follow style tags
   vocalGender?: "m" | "f"
+  // Mashup mode: two reference audio tracks blended into one new song
+  mashupAudio1Url?: string
+  mashupAudio2Url?: string
+  weirdnessConstraint?: number  // 0–1: how experimental the blend can be
+  // Kie track-level IDs (needed for replace-section / language translate)
+  musicAudioId?: string    // individual track ID within the generation task
+  musicDuration?: number   // track duration in seconds
 }
 
 export type SceneData = {
@@ -88,6 +96,7 @@ export type SceneData = {
 type StepKey =
   | "import"
   | "style-copy"
+  | "mashup"
   | "song-idea"
   | "lyrics"
   | "music"
@@ -99,6 +108,7 @@ type StepKey =
 const STEP_META: Record<StepKey, { label: string; short: string; icon: React.ElementType }> = {
   import:       { label: "Import Assets",  short: "Import",  icon: FolderOpen },
   "style-copy": { label: "Copy Style",     short: "Style",   icon: Music2 },
+  mashup:       { label: "Mashup Setup",   short: "Mashup",  icon: Shuffle },
   "song-idea":  { label: "Song Idea",      short: "Idea",    icon: Music2 },
   lyrics:       { label: "Lyrics & Style", short: "Lyrics",  icon: FileText },
   music:        { label: "Generate Music", short: "Music",   icon: Headphones },
@@ -114,8 +124,10 @@ function buildSteps(mode: FlowMode, data: Partial<ProjectData>): StepKey[] {
     return ["song-idea", "lyrics", "music", "storyboard", "images", "assets", "video"]
   }
   if (mode === "style-copy") {
-    // Style copy: tag reference style → go straight to music generation → storyboard → images
     return ["style-copy", "music", "storyboard", "images", "assets", "video"]
+  }
+  if (mode === "mashup") {
+    return ["mashup", "music", "storyboard", "images", "assets", "video"]
   }
   // Import mode — skip steps where assets are already provided
   const steps: StepKey[] = ["import", "lyrics"]
@@ -308,6 +320,12 @@ export function CreateFlow() {
             data={mergedData}
             onNext={(data) => goNext(data)}
             onBack={() => setMode(null)}
+          />
+        )}
+        {currentKey === "mashup" && (
+          <StepMashup
+            data={mergedData}
+            onNext={(data) => goNext(data)}
           />
         )}
         {currentKey === "song-idea" && (
