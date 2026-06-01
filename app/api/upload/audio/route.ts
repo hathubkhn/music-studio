@@ -1,63 +1,44 @@
 import { NextRequest, NextResponse } from "next/server"
-import { writeFile, mkdir } from "fs/promises"
-import { existsSync } from "fs"
-import path from "path"
-import os from "os"
+import { put } from "@vercel/blob"
 import { randomUUID } from "crypto"
 
-const TEMP_DIR = path.join(os.tmpdir(), "music-studio-uploads")
-
 const AUDIO_EXTENSIONS = ["mp3", "mp4", "wav", "m4a", "ogg", "flac", "aac", "webm"]
+const MAX_SIZE_BYTES    = 200 * 1024 * 1024  // 200 MB (Kie.ai limit)
 
 export async function POST(req: NextRequest) {
   try {
-    if (!existsSync(TEMP_DIR)) {
-      await mkdir(TEMP_DIR, { recursive: true })
-    }
-
     const formData = await req.formData()
     const file = formData.get("file") as File | null
+
     if (!file || file.size === 0) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 })
     }
 
-    // Validate extension
-    const originalExt = (file.name.split(".").pop() || "mp3").toLowerCase()
-    if (!AUDIO_EXTENSIONS.includes(originalExt)) {
+    const ext = (file.name.split(".").pop() ?? "mp3").toLowerCase()
+    if (!AUDIO_EXTENSIONS.includes(ext)) {
       return NextResponse.json(
-        { error: `Unsupported format: .${originalExt}. Use: ${AUDIO_EXTENSIONS.join(", ")}` },
+        { error: `Unsupported format: .${ext}. Allowed: ${AUDIO_EXTENSIONS.join(", ")}` },
         { status: 400 }
       )
     }
 
-    // Max 50 MB
-    if (file.size > 50 * 1024 * 1024) {
-      return NextResponse.json({ error: "File too large (max 50 MB)" }, { status: 400 })
+    if (file.size > MAX_SIZE_BYTES) {
+      return NextResponse.json({ error: "File too large (max 200 MB)" }, { status: 400 })
     }
 
-    const fileId   = randomUUID()
-    const fileName = `${fileId}.${originalExt}`
-    const filePath = path.join(TEMP_DIR, fileName)
+    // Use a UUID filename to avoid collisions / sanitise the original name
+    const blobName = `audio-uploads/${randomUUID()}.${ext}`
 
-    const buffer = Buffer.from(await file.arrayBuffer())
-    await writeFile(filePath, buffer)
+    const blob = await put(blobName, file, {
+      access:      "public",        // Kie.ai needs a publicly accessible URL
+      contentType: file.type || `audio/${ext}`,
+    })
 
-    // Build the public URL based on the app's base URL
-    const appUrl    = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-    const publicUrl = `${appUrl}/api/upload/audio/${fileName}`
-
-    const isLocalhost = appUrl.includes("localhost") || appUrl.includes("127.0.0.1")
-
-    console.log(`[AudioUpload] Stored ${file.name} (${(file.size / 1024).toFixed(0)} KB) → ${publicUrl}`)
+    console.log(`[AudioUpload] ${file.name} (${(file.size / 1024).toFixed(0)} KB) → ${blob.url}`)
 
     return NextResponse.json({
-      fileId,
-      url:        publicUrl,
-      fileName:   file.name,
-      isLocalhost,
-      warning:    isLocalhost
-        ? "Running on localhost — Kie.ai cannot reach this URL from the internet. Cover mode requires a publicly accessible URL. Either deploy to production or paste a public audio URL instead."
-        : null,
+      url:      blob.url,
+      fileName: file.name,
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Upload failed"

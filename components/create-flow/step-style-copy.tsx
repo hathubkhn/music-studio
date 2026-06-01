@@ -319,10 +319,7 @@ export function StepStyleCopy({ data, onNext, onBack }: Props) {
       if (!res.ok) throw new Error((await res.json()).error || "Upload failed")
       const data = await res.json()
       setHostedUrl(data.url)
-      if (data.warning) {
-        setUploadWarning(data.warning)
-        toast.warning("File uploaded, but see warning about localhost", { duration: 6000 })
-      } else {
+      {
         toast.success(`File uploaded — Cover Mode activated!`)
       }
     } catch (err) {
@@ -564,14 +561,6 @@ export function StepStyleCopy({ data, onNext, onBack }: Props) {
                   </div>
                 )}
 
-                {/* Localhost warning */}
-                {uploadWarning && (
-                  <Alert className="border-amber-500/30 bg-amber-500/5 py-2">
-                    <AlertDescription className="text-xs text-amber-300">
-                      ⚠ {uploadWarning}
-                    </AlertDescription>
-                  </Alert>
-                )}
               </div>
             )}
           </div>

@@ -3,7 +3,7 @@
 import { useState, useRef } from "react"
 import {
   Shuffle, Upload, Play, Pause, X, ArrowRight, Link2,
-  Check, Music2, Wand2, Loader2, Info, ChevronDown, ChevronUp,
+  Check, Music2, Wand2, Loader2, ChevronDown, ChevronUp,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -12,7 +12,6 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import type { ProjectData } from "./create-flow"
 
@@ -73,15 +72,12 @@ interface AudioInputProps {
   setUrl: (u: string) => void
   hostedUrl: string
   setHostedUrl: (u: string) => void
-  uploadWarning: string
-  setUploadWarning: (w: string) => void
 }
 
 function AudioInput({
   label, color,
   url, setUrl,
   hostedUrl, setHostedUrl,
-  uploadWarning, setUploadWarning,
 }: AudioInputProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -112,7 +108,6 @@ function AudioInput({
     // Upload to server to get a public URL
     setUploading(true)
     setHostedUrl("")
-    setUploadWarning("")
     try {
       const form = new FormData()
       form.append("file", file)
@@ -121,7 +116,7 @@ function AudioInput({
       if (!res.ok) throw new Error(json.error || "Upload failed")
       setHostedUrl(json.url)
       setUrl(json.url)
-      if (json.warning) setUploadWarning(json.warning)
+      toast.success("File uploaded!")
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed")
     } finally {
@@ -150,7 +145,6 @@ function AudioInput({
     setHostedUrl("")
     setPreviewUrl("")
     setFileName("")
-    setUploadWarning("")
     setIsPlaying(false)
     audioRef.current?.pause()
     audioRef.current = null
@@ -237,13 +231,6 @@ function AudioInput({
           </div>
         )}
 
-        {uploadWarning && (
-          <Alert className="py-2">
-            <Info className="w-3.5 h-3.5" />
-            <AlertDescription className="text-xs">{uploadWarning}</AlertDescription>
-          </Alert>
-        )}
-
         {hasAudio && (
           <div className="flex items-center gap-2">
             <Button size="sm" variant="outline" onClick={togglePlay} className={`gap-1 text-xs ${colorClass.btn}`}>
@@ -276,12 +263,10 @@ export function StepMashup({ data, onNext }: Props) {
   // Track A
   const [url1, setUrl1] = useState(data.mashupAudio1Url || "")
   const [hostedUrl1, setHostedUrl1] = useState(data.mashupAudio1Url || "")
-  const [warn1, setWarn1] = useState("")
 
   // Track B
   const [url2, setUrl2] = useState(data.mashupAudio2Url || "")
   const [hostedUrl2, setHostedUrl2] = useState(data.mashupAudio2Url || "")
-  const [warn2, setWarn2] = useState("")
 
   // Song params
   const [title, setTitle] = useState(data.title || "")
@@ -380,7 +365,6 @@ export function StepMashup({ data, onNext }: Props) {
           color="pink"
           url={url1} setUrl={setUrl1}
           hostedUrl={hostedUrl1} setHostedUrl={setHostedUrl1}
-          uploadWarning={warn1} setUploadWarning={setWarn1}
         />
         <div className="flex items-center gap-2 px-2">
           <div className="flex-1 h-px bg-border/50" />
@@ -394,7 +378,6 @@ export function StepMashup({ data, onNext }: Props) {
           color="purple"
           url={url2} setUrl={setUrl2}
           hostedUrl={hostedUrl2} setHostedUrl={setHostedUrl2}
-          uploadWarning={warn2} setUploadWarning={setWarn2}
         />
       </div>
 
