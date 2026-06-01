@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import type { ProjectData } from "./create-flow"
+import { uploadAudio } from "@/lib/upload-audio"
 
 // ── Tag data ──────────────────────────────────────────────────────────────────
 
@@ -109,13 +110,9 @@ function AudioInput({
     setUploading(true)
     setHostedUrl("")
     try {
-      const form = new FormData()
-      form.append("file", file)
-      const res = await fetch("/api/upload/audio", { method: "POST", body: form })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || "Upload failed")
-      setHostedUrl(json.url)
-      setUrl(json.url)
+      const result = await uploadAudio(file, (pct) => void pct)
+      setHostedUrl(result.url)
+      setUrl(result.url)
       toast.success("File uploaded!")
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed")

@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import type { ProjectData } from "./create-flow"
+import { uploadAudio } from "@/lib/upload-audio"
 
 // ── Tag / Style data ──────────────────────────────────────────────────────────
 
@@ -224,7 +225,6 @@ export function StepStyleCopy({ data, onNext, onBack }: Props) {
   const [blobName, setBlobName]     = useState("")
   const [hostedUrl, setHostedUrl]   = useState("")  // public URL after upload
   const [isUploading, setIsUploading] = useState(false)
-  const [uploadWarning, setUploadWarning] = useState("")
   const [isPlaying, setIsPlaying]   = useState(false)
   const audioRef      = useRef<HTMLAudioElement>(null)
   const audioInputRef = useRef<HTMLInputElement>(null)
@@ -298,33 +298,25 @@ export function StepStyleCopy({ data, onNext, onBack }: Props) {
   }
 
   const handleAudioFile = async (file: File) => {
-    if (!file.name.match(/\.(mp3|mp4|wav|m4a|ogg|flac|aac)$/i)) {
-      toast.error("Please upload MP3, WAV, M4A, OGG, or FLAC")
+    if (!file.name.match(/\.(mp3|mp4|wav|m4a|ogg|flac|aac|webm)$/i)) {
+      toast.error("Please upload MP3, WAV, M4A, OGG, FLAC or AAC")
       return
     }
-    // Create local preview URL immediately
+    // Create local preview URL immediately for in-browser playback
     if (blobUrl) URL.revokeObjectURL(blobUrl)
     const localUrl = URL.createObjectURL(file)
     setBlobUrl(localUrl)
     setBlobName(file.name)
     setHostedUrl("")
-    setUploadWarning("")
 
-    // Auto-upload to server to get a public URL for Kie.ai
+    // Upload directly to Vercel Blob (browser → Blob storage, bypasses 4.5 MB limit)
     setIsUploading(true)
     try {
-      const fd = new FormData()
-      fd.append("file", file)
-      const res = await fetch("/api/upload/audio", { method: "POST", body: fd })
-      if (!res.ok) throw new Error((await res.json()).error || "Upload failed")
-      const data = await res.json()
-      setHostedUrl(data.url)
-      {
-        toast.success(`File uploaded — Cover Mode activated!`)
-      }
+      const result = await uploadAudio(file)
+      setHostedUrl(result.url)
+      toast.success("File uploaded — Cover Mode activated!")
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Upload failed"
-      setUploadWarning(`Could not upload to server: ${msg}. Cover mode may not work.`)
       toast.error(`Upload failed: ${msg}`)
     } finally {
       setIsUploading(false)
@@ -546,7 +538,7 @@ export function StepStyleCopy({ data, onNext, onBack }: Props) {
                   <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground shrink-0"
                     onClick={() => {
                       setBlobUrl(""); setBlobName("")
-                      setHostedUrl(""); setUploadWarning("")
+                      setHostedUrl("")
                       setIsPlaying(false)
                     }}
                   >
