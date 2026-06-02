@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       ? `, slow tempo, extended arrangement, ${perSongMin}-${perSongMin + 2} minutes`
       : ""
 
-    const prompt = `You are a music album producer. Create a cohesive album of ${input.numTracks} songs.
+    const prompt = `You are a music album producer. Plan a cohesive album of ${input.numTracks} songs.
 
 Album concept:
 - Theme: ${input.theme}
@@ -45,14 +45,14 @@ Album concept:
 - Target audience: ${input.audience}
 - Target total duration: ~${input.targetDurationMin ?? input.numTracks * 4} minutes
 
-Requirements for each song:
-1. Unique title that fits the album theme
+For each song provide:
+1. A unique title that fits the album theme
 2. A short description (1-2 sentences) of what the song is about
-3. Complete lyrics with proper song structure: [Intro], [Verse 1], [Pre-Chorus], [Chorus], [Verse 2], [Pre-Chorus], [Chorus], [Bridge], [Chorus], [Outro]
-4. Lyrics MUST be written in ${input.language}
-5. Each song explores a different facet of the theme
-6. Songs should feel like a cohesive album that tells a story when listened in order
-7. ${durationHint}
+3. A style prompt for the AI music generator
+4. Each song explores a different facet of the theme
+5. Songs should feel like a cohesive album that tells a story when listened in order
+
+Do NOT write lyrics — they will be generated separately.
 
 Return a valid JSON object with exactly this shape:
 {
@@ -61,13 +61,12 @@ Return a valid JSON object with exactly this shape:
       "order": 1,
       "title": "Song Title Here",
       "description": "What this song is about",
-      "lyrics": "[Intro]\\nLyrics here...\\n\\n[Verse 1]\\n...",
       "stylePrompt": "${input.genre}, ${input.mood}, ${input.stylePrompt || "cinematic"}${styleExtra}"
     }
   ]
 }
 
-IMPORTANT: Return ONLY the JSON object above with a "tracks" key whose value is an array of exactly ${input.numTracks} track objects. No other keys, no extra text.`
+IMPORTANT: Return ONLY the JSON object above with a "tracks" key — an array of exactly ${input.numTracks} objects. No lyrics field. No extra text.`
 
     const completion = await openai.chat.completions.create({
       model:   process.env.OPENAI_MODEL || "gpt-4o-mini",
