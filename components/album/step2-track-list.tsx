@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -45,6 +45,25 @@ async function fetchLyrics(params: {
 }
 
 export function AlbumTrackList({ data, onChange, onNext, onBack }: Props) {
+  // Local track state — avoids stale-closure issues when parallel lyrics
+  // calls all try to update the shared parent state simultaneously
+  const [localTracks, setLocalTracks] = useState<AlbumTrack[]>(data.tracks)
+  const localTracksRef = useRef<AlbumTrack[]>(data.tracks)
+
+  // Keep ref in sync with local state (used by parallel async calls)
+  const setTracks = (updater: AlbumTrack[] | ((prev: AlbumTrack[]) => AlbumTrack[])) => {
+    setLocalTracks((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater
+      localTracksRef.current = next
+      return next
+    })
+  }
+
+  // Sync to parent whenever local tracks change
+  useEffect(() => {
+    onChange({ tracks: localTracks })
+  }, [localTracks]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const [isGeneratingMeta, setIsGeneratingMeta] = useState(false)
   const [lyricsStates, setLyricsStates]         = useState<LyricsState[]>([])
   const [expandedTrack, setExpandedTrack]        = useState<number | null>(null)
@@ -53,19 +72,22 @@ export function AlbumTrackList({ data, onChange, onNext, onBack }: Props) {
   const lyricsDone       = lyricsStates.filter((s) => s === "done").length
   const lyricsFailed     = lyricsStates.filter((s) => s === "failed").length
   const lyricsTotal      = lyricsStates.length
+  const isWritingLyrics  = lyricsGenerating > 0
 
-  // ── Generate lyrics for a single track ───────────────────────────────────
-  const generateOneLyrics = useCallback(async (
-    index: number,
-    tracks: AlbumTrack[],
-    perSongMin?: number
-  ) => {
-    const track = tracks[index]
+  const setLyricsState = (index: number, state: LyricsState) => {
     setLyricsStates((prev) => {
       const next = [...prev]
-      next[index] = "generating"
+      next[index] = state
       return next
     })
+  }
+
+  // ── Generate lyrics for one track ─────────────────────────────────────────
+  const generateOneLyrics = async (index: number, perSongMin?: number) => {
+    // Always read the latest track from the ref to avoid stale closure
+    const track = localTracksRef.current[index]
+    if (!track) return
+    setLyricsState(index, "generating")
     try {
       const lyrics = await fetchLyrics({
         trackTitle:        track.title,
@@ -77,24 +99,17 @@ export function AlbumTrackList({ data, onChange, onNext, onBack }: Props) {
         language:          data.language,
         targetDurationMin: perSongMin,
       })
-      onChange({
-        tracks: data.tracks.map((t, i) => (i === index ? { ...t, lyrics } : t)),
-      })
-      setLyricsStates((prev) => {
-        const next = [...prev]
-        next[index] = "done"
-        return next
-      })
+      // Use functional updater so parallel calls compose correctly
+      setTracks((prev) =>
+        prev.map((t, i) => (i === index ? { ...t, lyrics } : t))
+      )
+      setLyricsState(index, "done")
     } catch {
-      setLyricsStates((prev) => {
-        const next = [...prev]
-        next[index] = "failed"
-        return next
-      })
+      setLyricsState(index, "failed")
     }
-  }, [data, onChange])
+  }
 
-  // ── Step 1: generate track metadata (fast, no lyrics) ────────────────────
+  // ── Step 1: generate metadata (fast), then lyrics per-track in parallel ───
   const generateTracks = async () => {
     setIsGeneratingMeta(true)
     try {
@@ -117,26 +132,32 @@ export function AlbumTrackList({ data, onChange, onNext, onBack }: Props) {
       const newTracks: AlbumTrack[] = (tracks as AlbumTrack[]).map((t, i) => ({
         ...t,
         order:  t.order ?? i + 1,
-        status: "pending",
+        status: "pending" as const,
         lyrics: "",
       }))
-      onChange({ tracks: newTracks })
-      toast.success(`${newTracks.length} track titles generated — writing lyrics now…`)
 
-      // ── Step 2: generate lyrics per-track in parallel (4 at a time) ──────
-      const CONCURRENCY = 4
-      const perSongMin = data.targetDurationMin
-        ? Math.round(data.targetDurationMin / newTracks.length)
-        : undefined
+      // Commit metadata to local state + ref immediately
+      setTracks(newTracks)
+      toast.success(`${newTracks.length} track titles ready — writing lyrics now…`)
 
+      // Initialise lyrics state
       const initialStates: LyricsState[] = newTracks.map(() => "pending")
       setLyricsStates(initialStates)
 
+      // Ensure ref is up to date before parallel calls begin
+      localTracksRef.current = newTracks
+
+      // Phase 2: lyrics in parallel batches of 4
+      const perSongMin = data.targetDurationMin
+        ? Math.round(data.targetDurationMin / newTracks.length)
+        : undefined
+      const CONCURRENCY = 4
       for (let i = 0; i < newTracks.length; i += CONCURRENCY) {
-        const batch = newTracks.slice(i, i + CONCURRENCY)
-        await Promise.all(
-          batch.map((_, bi) => generateOneLyrics(i + bi, newTracks, perSongMin))
+        const indices = Array.from(
+          { length: Math.min(CONCURRENCY, newTracks.length - i) },
+          (_, bi) => i + bi
         )
+        await Promise.all(indices.map((idx) => generateOneLyrics(idx, perSongMin)))
       }
       toast.success("All lyrics generated!")
     } catch (err) {
@@ -146,44 +167,39 @@ export function AlbumTrackList({ data, onChange, onNext, onBack }: Props) {
     }
   }
 
-  // ── Regenerate lyrics for one track ──────────────────────────────────────
+  // ── Regenerate lyrics for a single track ─────────────────────────────────
   const regenLyrics = async (index: number) => {
     const perSongMin = data.targetDurationMin
-      ? Math.round(data.targetDurationMin / data.tracks.length)
+      ? Math.round(data.targetDurationMin / localTracks.length)
       : undefined
-    await generateOneLyrics(index, data.tracks, perSongMin)
+    await generateOneLyrics(index, perSongMin)
   }
 
   const updateTrack = (index: number, patch: Partial<AlbumTrack>) => {
-    const updated = data.tracks.map((t, i) => (i === index ? { ...t, ...patch } : t))
-    onChange({ tracks: updated })
+    setTracks((prev) => prev.map((t, i) => (i === index ? { ...t, ...patch } : t)))
   }
 
   const addTrack = () => {
     const newTrack: AlbumTrack = {
-      order:  data.tracks.length + 1,
+      order:  localTracks.length + 1,
       title:  "",
       lyrics: "",
       status: "pending",
     }
-    onChange({ tracks: [...data.tracks, newTrack] })
+    setTracks((prev) => [...prev, newTrack])
     setLyricsStates((prev) => [...prev, "pending"])
-    setExpandedTrack(data.tracks.length)
+    setExpandedTrack(localTracks.length)
   }
 
   const removeTrack = (index: number) => {
-    const updated = data.tracks
-      .filter((_, i) => i !== index)
-      .map((t, i) => ({ ...t, order: i + 1 }))
-    onChange({ tracks: updated })
+    setTracks((prev) =>
+      prev.filter((_, i) => i !== index).map((t, i) => ({ ...t, order: i + 1 }))
+    )
     setLyricsStates((prev) => prev.filter((_, i) => i !== index))
   }
 
-  const canContinue = data.tracks.length >= 2 && data.tracks.every((t) => t.title.trim())
-  const isWritingLyrics = lyricsGenerating > 0
-  const totalLyrics = data.tracks.reduce((acc, t) => acc + (t.lyrics?.length ?? 0), 0)
-
-  // Lyrics overall progress
+  const canContinue = localTracks.length >= 2 && localTracks.every((t) => t.title.trim())
+  const totalLyrics = localTracks.reduce((acc, t) => acc + (t.lyrics?.length ?? 0), 0)
   const lyricsProgress = lyricsTotal > 0 ? Math.round((lyricsDone / lyricsTotal) * 100) : 0
 
   return (
@@ -195,28 +211,28 @@ export function AlbumTrackList({ data, onChange, onNext, onBack }: Props) {
             Track List — {data.title}
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {data.tracks.length > 0
-              ? `${data.tracks.length} tracks — review and edit before generating music`
-              : "Click Generate to have AI create all song titles and lyrics for your album"}
+            {localTracks.length > 0
+              ? `${localTracks.length} tracks — review and edit before generating music`
+              : `Click Generate to have AI create all song titles and lyrics for your album`}
           </p>
         </div>
         <Button
-          variant={data.tracks.length > 0 ? "outline" : "gradient"}
+          variant={localTracks.length > 0 ? "outline" : "gradient"}
           onClick={generateTracks}
           disabled={isGeneratingMeta || isWritingLyrics}
           className="gap-2 shrink-0"
         >
           {isGeneratingMeta
             ? <><Loader2 className="w-4 h-4 animate-spin" />Generating…</>
-            : data.tracks.length > 0
+            : localTracks.length > 0
             ? <><RefreshCw className="w-4 h-4" />Regenerate All</>
             : <><Wand2 className="w-4 h-4" />Generate with AI</>
           }
         </Button>
       </div>
 
-      {/* Lyrics generation progress bar */}
-      {lyricsTotal > 0 && (lyricsDone < lyricsTotal || lyricsFailed > 0) && (
+      {/* Lyrics overall progress */}
+      {lyricsTotal > 0 && lyricsDone < lyricsTotal && (
         <div className="space-y-1.5">
           <div className="flex justify-between text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5">
@@ -237,7 +253,7 @@ export function AlbumTrackList({ data, onChange, onNext, onBack }: Props) {
       )}
 
       {/* Track list */}
-      {data.tracks.length === 0 ? (
+      {localTracks.length === 0 ? (
         <Card className="border-dashed border-violet-500/20 bg-violet-500/3">
           <CardContent className="p-10 flex flex-col items-center gap-4 text-center">
             <div className="w-14 h-14 rounded-full bg-violet-500/10 flex items-center justify-center">
@@ -257,19 +273,19 @@ export function AlbumTrackList({ data, onChange, onNext, onBack }: Props) {
         </Card>
       ) : (
         <div className="space-y-2">
-          {data.tracks.map((track, i) => {
+          {localTracks.map((track, i) => {
             const isExpanded = expandedTrack === i
             const ls = lyricsStates[i] ?? "pending"
             return (
               <Card
                 key={i}
                 className={`border-border/60 overflow-hidden transition-all ${
-                  ls === "done" ? "border-teal-500/20" :
-                  ls === "generating" ? "border-violet-500/20" :
-                  ls === "failed" ? "border-destructive/20" : ""
+                  ls === "done"       ? "border-teal-500/20"       :
+                  ls === "generating" ? "border-violet-500/20"     :
+                  ls === "failed"     ? "border-destructive/20"    : ""
                 }`}
               >
-                {/* Track header row */}
+                {/* Track header */}
                 <div
                   className="flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/20 transition-colors"
                   onClick={() => setExpandedTrack(isExpanded ? null : i)}
@@ -285,10 +301,9 @@ export function AlbumTrackList({ data, onChange, onNext, onBack }: Props) {
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {/* Lyrics status badge */}
                     {ls === "generating" && (
                       <Badge variant="outline" className="text-[10px] text-violet-400 border-violet-500/30 gap-1">
-                        <Loader2 className="w-2.5 h-2.5 animate-spin" />Writing lyrics…
+                        <Loader2 className="w-2.5 h-2.5 animate-spin" />Writing…
                       </Badge>
                     )}
                     {ls === "done" && track.lyrics && (
@@ -308,7 +323,10 @@ export function AlbumTrackList({ data, onChange, onNext, onBack }: Props) {
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
-                    {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                    {isExpanded
+                      ? <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                      : <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                    }
                   </div>
                 </div>
 
@@ -327,7 +345,7 @@ export function AlbumTrackList({ data, onChange, onNext, onBack }: Props) {
                       <div className="space-y-1.5">
                         <label className="text-xs font-medium text-muted-foreground">
                           Style Override
-                          <span className="font-normal text-muted-foreground/60 ml-1">(optional — inherits album style)</span>
+                          <span className="font-normal text-muted-foreground/60 ml-1">(optional)</span>
                         </label>
                         <Input
                           value={track.stylePrompt ?? ""}
@@ -381,8 +399,8 @@ export function AlbumTrackList({ data, onChange, onNext, onBack }: Props) {
         </div>
       )}
 
-      {/* Add track button */}
-      {data.tracks.length > 0 && (
+      {/* Add track */}
+      {localTracks.length > 0 && (
         <button
           type="button"
           onClick={addTrack}
@@ -392,14 +410,14 @@ export function AlbumTrackList({ data, onChange, onNext, onBack }: Props) {
         </button>
       )}
 
-      {/* Summary bar */}
-      {data.tracks.length > 0 && (
+      {/* Summary */}
+      {localTracks.length > 0 && (
         <div className="flex items-center gap-4 text-xs text-muted-foreground bg-muted/30 rounded-lg px-4 py-2.5">
-          <span>{data.tracks.length} tracks</span>
+          <span>{localTracks.length} tracks</span>
           <span className="w-px h-3 bg-border" />
           <span>{totalLyrics.toLocaleString()} total chars</span>
           <span className="w-px h-3 bg-border" />
-          <span>Est. {data.tracks.length * 2}–{data.tracks.length * 4} min video</span>
+          <span>Est. {localTracks.length * 2}–{localTracks.length * 4} min video</span>
         </div>
       )}
 
@@ -407,12 +425,7 @@ export function AlbumTrackList({ data, onChange, onNext, onBack }: Props) {
         <Button variant="outline" onClick={onBack} disabled={isGeneratingMeta || isWritingLyrics} className="gap-2">
           <ArrowLeft className="w-4 h-4" />Back
         </Button>
-        <Button
-          variant="gradient"
-          onClick={onNext}
-          disabled={!canContinue}
-          className="gap-2"
-        >
+        <Button variant="gradient" onClick={onNext} disabled={!canContinue} className="gap-2">
           Start Generating Music
           <ArrowRight className="w-4 h-4" />
         </Button>
