@@ -17,11 +17,13 @@ import {
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { upload } from "@vercel/blob/client"
+import { generateTrackImage } from "@/lib/composite-track-image"
 
 interface Props {
   albumId:      string
   trackId:      string
   trackTitle:   string
+  trackOrder?:  number
   lyrics?:      string | null
   stylePrompt?: string | null
   albumTheme?:  string | null
@@ -34,11 +36,12 @@ interface Props {
 type Phase = "idle" | "generating" | "uploading" | "saving"
 
 export function TrackImageEditor({
-  albumId, trackId, trackTitle, lyrics, stylePrompt,
+  albumId, trackId, trackTitle, trackOrder = 1, lyrics, stylePrompt,
   albumTheme, albumMood, albumGenre, initialUrl, onSaved,
 }: Props) {
-  const [imageUrl, setImageUrl] = useState<string | null>(initialUrl ?? null)
-  const [phase, setPhase]       = useState<Phase>("idle")
+  const [imageUrl, setImageUrl]   = useState<string | null>(initialUrl ?? null)
+  const [phase, setPhase]         = useState<Phase>("idle")
+  const [phaseMsg, setPhaseMsg]   = useState("")
   const fileRef = useRef<HTMLInputElement>(null)
 
   const isBusy = phase !== "idle"
@@ -63,47 +66,24 @@ export function TrackImageEditor({
     }
   }
 
-  // ── AI generate ───────────────────────────────────────────────────────────
+  // ── AI generate + composite title ─────────────────────────────────────────
   const generateAI = async () => {
     setPhase("generating")
+    setPhaseMsg("Generating image…")
     try {
-      // Build a rich image prompt from track metadata
-      const parts = [
-        albumMood   && `${albumMood} mood`,
-        albumGenre  && albumGenre,
-        albumTheme  && albumTheme.slice(0, 80),
-        stylePrompt && stylePrompt.slice(0, 80),
-        "cinematic background, no people, no text, ultra HD, 16:9",
-      ].filter(Boolean)
-      const prompt = `${trackTitle} — ${parts.join(", ")}`
-
-      const res = await fetch("/api/kie/image/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt,
-          negativePrompt: "text, watermark, logo, person, face, blurry, low quality, nsfw",
-          aspectRatio: "16:9",
-        }),
+      const url = await generateTrackImage({
+        albumId, trackId, trackTitle, trackOrder,
+        lyrics, stylePrompt, albumTheme, albumMood, albumGenre,
+        onProgress: (msg) => setPhaseMsg(msg),
       })
-      if (!res.ok) throw new Error((await res.json()).error)
-      const { taskId } = await res.json()
-
-      // Poll up to 90 s
-      for (let i = 0; i < 30; i++) {
-        await new Promise((r) => setTimeout(r, 3000))
-        const s   = await fetch(`/api/kie/image/status?jobId=${taskId}`)
-        const out = await s.json()
-        if (out.status === "completed" && out.result?.[0]?.url) {
-          await persistUrl(out.result[0].url)
-          return
-        }
-        if (out.status === "failed") throw new Error(out.error ?? "Generation failed")
-      }
-      throw new Error("Timed out")
+      setImageUrl(url)
+      onSaved(url)
+      toast.success("Thumbnail generated!")
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Image generation failed")
+    } finally {
       setPhase("idle")
+      setPhaseMsg("")
     }
   }
 
@@ -207,7 +187,7 @@ export function TrackImageEditor({
                 ? <Loader2 className="w-3 h-3 animate-spin" />
                 : <Sparkles className="w-3 h-3 text-violet-400" />
               }
-              {phase === "generating" ? "Generating…" : "AI Generate"}
+              {phase === "generating" ? (phaseMsg || "Generating…") : "AI Generate"}
             </Button>
             <Button
               size="sm" variant="outline"

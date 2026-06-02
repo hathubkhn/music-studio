@@ -277,6 +277,7 @@ export function AlbumDetail({ album }: { album: Album }) {
                       albumId={album.id}
                       trackId={track.id}
                       trackTitle={track.title}
+                      trackOrder={track.order}
                       lyrics={track.lyrics}
                       stylePrompt={track.stylePrompt}
                       albumTheme={album.theme}

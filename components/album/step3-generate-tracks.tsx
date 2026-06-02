@@ -11,6 +11,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import type { AlbumData, AlbumTrack } from "./album-create-flow"
+import { generateTrackImage } from "@/lib/composite-track-image"
 
 interface Props {
   data: AlbumData
@@ -20,10 +21,12 @@ interface Props {
 }
 
 type TrackJobState = {
-  jobId?: string
-  status: "pending" | "generating" | "completed" | "failed"
-  audioUrl?: string
-  errorMsg?: string
+  jobId?:       string
+  status:       "pending" | "generating" | "completed" | "failed"
+  audioUrl?:    string
+  thumbnailUrl?: string
+  imgStatus?:   "generating" | "done" | "failed"
+  errorMsg?:    string
 }
 
 export function AlbumGenerate({ data, onChange, onBack, onFinish }: Props) {
@@ -106,7 +109,8 @@ export function AlbumGenerate({ data, onChange, onBack, onFinish }: Props) {
         if (result.status === "completed" && result.result?.[0]?.url) {
           clearInterval(timer)
           pollTimers.current.delete(trackIdx)
-          const url = result.result[0].url
+          const url   = result.result[0].url
+          const track = data.tracks[trackIdx]
           setJobs((prev) => {
             const next = [...prev]
             next[trackIdx] = { ...next[trackIdx], status: "completed", audioUrl: url }
@@ -118,7 +122,37 @@ export function AlbumGenerate({ data, onChange, onBack, onFinish }: Props) {
             ),
           })
           await patchTrack(aid, trackDbId, { status: "COMPLETED", audioUrl: url })
-          toast.success(`Track ${trackIdx + 1}: "${data.tracks[trackIdx].title}" done!`)
+          toast.success(`Track ${trackIdx + 1}: "${track.title}" done!`)
+
+          // Auto-generate thumbnail (fire-and-forget)
+          setJobs((prev) => {
+            const next = [...prev]
+            next[trackIdx] = { ...next[trackIdx], imgStatus: "generating" }
+            return next
+          })
+          generateTrackImage({
+            albumId:     aid,
+            trackId:     trackDbId,
+            trackTitle:  track.title,
+            trackOrder:  track.order,
+            lyrics:      track.lyrics,
+            stylePrompt: track.stylePrompt ?? data.stylePrompt,
+            albumTheme:  data.theme,
+            albumMood:   data.mood,
+            albumGenre:  data.genre,
+          }).then((thumbUrl) => {
+            setJobs((prev) => {
+              const next = [...prev]
+              next[trackIdx] = { ...next[trackIdx], imgStatus: "done", thumbnailUrl: thumbUrl }
+              return next
+            })
+          }).catch(() => {
+            setJobs((prev) => {
+              const next = [...prev]
+              next[trackIdx] = { ...next[trackIdx], imgStatus: "failed" }
+              return next
+            })
+          })
         } else if (result.status === "failed") {
           clearInterval(timer)
           pollTimers.current.delete(trackIdx)
@@ -284,13 +318,31 @@ export function AlbumGenerate({ data, onChange, onBack, onFinish }: Props) {
                   {i + 1}
                 </span>
                 {statusIcon(job)}
+                {/* Thumbnail preview */}
+                {job.thumbnailUrl ? (
+                  <div className="w-10 h-10 rounded overflow-hidden border border-border/40 shrink-0">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={job.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                  </div>
+                ) : job.imgStatus === "generating" ? (
+                  <div className="w-10 h-10 rounded border border-border/40 bg-violet-500/10 flex items-center justify-center shrink-0">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-400" />
+                  </div>
+                ) : null}
+
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{track.title}</p>
                   {track.description && (
                     <p className="text-xs text-muted-foreground truncate">{track.description}</p>
                   )}
                   {job.status === "generating" && (
-                    <p className="text-xs text-amber-400 mt-0.5">Generating via Suno… (~2 min)</p>
+                    <p className="text-xs text-amber-400 mt-0.5">Generating music… (~2 min)</p>
+                  )}
+                  {job.imgStatus === "generating" && (
+                    <p className="text-xs text-violet-400 mt-0.5">Generating thumbnail…</p>
+                  )}
+                  {job.imgStatus === "done" && (
+                    <p className="text-xs text-teal-400 mt-0.5">✓ Thumbnail ready</p>
                   )}
                   {job.status === "failed" && (
                     <p className="text-xs text-destructive mt-0.5">{job.errorMsg}</p>
