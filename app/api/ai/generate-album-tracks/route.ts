@@ -54,18 +54,20 @@ Requirements for each song:
 6. Songs should feel like a cohesive album that tells a story when listened in order
 7. ${durationHint}
 
-Return a valid JSON array with exactly ${input.numTracks} objects:
-[
-  {
-    "order": 1,
-    "title": "Song Title Here",
-    "description": "What this song is about",
-    "lyrics": "[Intro]\\nLyrics here...\\n\\n[Verse 1]\\n...",
-    "stylePrompt": "${input.genre}, ${input.mood}, ${input.stylePrompt || "cinematic"}${styleExtra}"
-  }
-]
+Return a valid JSON object with exactly this shape:
+{
+  "tracks": [
+    {
+      "order": 1,
+      "title": "Song Title Here",
+      "description": "What this song is about",
+      "lyrics": "[Intro]\\nLyrics here...\\n\\n[Verse 1]\\n...",
+      "stylePrompt": "${input.genre}, ${input.mood}, ${input.stylePrompt || "cinematic"}${styleExtra}"
+    }
+  ]
+}
 
-IMPORTANT: Return ONLY the JSON array, no other text.`
+IMPORTANT: Return ONLY the JSON object above with a "tracks" key whose value is an array of exactly ${input.numTracks} track objects. No other keys, no extra text.`
 
     const completion = await openai.chat.completions.create({
       model:   process.env.OPENAI_MODEL || "gpt-4o-mini",
@@ -78,10 +80,29 @@ IMPORTANT: Return ONLY the JSON array, no other text.`
     let tracks: unknown[]
     try {
       const parsed = JSON.parse(raw)
-      // The model might wrap it in a key
-      tracks = Array.isArray(parsed) ? parsed : (parsed.tracks ?? parsed.songs ?? Object.values(parsed)[0] ?? [])
+      // Robustly extract the array regardless of wrapping key used by the model
+      if (Array.isArray(parsed)) {
+        tracks = parsed
+      } else if (Array.isArray(parsed.tracks)) {
+        tracks = parsed.tracks
+      } else if (Array.isArray(parsed.songs)) {
+        tracks = parsed.songs
+      } else {
+        // Last-resort: find the first array value in the object
+        const firstArr = Object.values(parsed).find((v) => Array.isArray(v)) as unknown[] | undefined
+        if (firstArr) {
+          tracks = firstArr
+        } else {
+          console.error("[generate-album-tracks] No array found in response:", raw.slice(0, 200))
+          return NextResponse.json({ error: "AI returned unexpected format — no track array found" }, { status: 500 })
+        }
+      }
     } catch {
       return NextResponse.json({ error: "Failed to parse AI response" }, { status: 500 })
+    }
+
+    if (tracks.length === 0) {
+      return NextResponse.json({ error: "AI returned an empty track list" }, { status: 500 })
     }
 
     return NextResponse.json({ tracks })
