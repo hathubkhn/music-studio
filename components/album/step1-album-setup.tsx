@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowRight, Disc3, Check } from "lucide-react"
+import { ArrowRight, Disc3, Check, Music2, Sparkles } from "lucide-react"
 import type { AlbumData } from "./album-create-flow"
 
 const GENRES = ["Pop","Rock","Hip-Hop","R&B","Jazz","Electronic","K-Pop","Folk","Classical","Lo-fi","EDM","Indie"]
@@ -141,32 +141,57 @@ export function AlbumSetup({ data, onChange, onNext }: Props) {
           </CardContent>
         </Card>
 
-        {/* Audience + style */}
+        {/* Audience */}
         <Card className="border-border/60">
-          <CardContent className="p-4 space-y-3">
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Target Audience</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {AUDIENCES.map((a) => (
-                  <button key={a} type="button" onClick={() => onChange({ audience: a })}
-                    className={`px-2.5 py-1 text-xs rounded-full border transition-all ${
-                      data.audience === a
-                        ? "border-rose-500/50 bg-rose-500/15 text-rose-300"
-                        : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
-                    }`}
-                  >
-                    {data.audience === a && <Check className="w-2.5 h-2.5 inline mr-1" />}{a}
-                  </button>
-                ))}
-              </div>
+          <CardContent className="p-4 space-y-2">
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Target Audience</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {AUDIENCES.map((a) => (
+                <button key={a} type="button" onClick={() => onChange({ audience: a })}
+                  className={`px-2.5 py-1 text-xs rounded-full border transition-all ${
+                    data.audience === a
+                      ? "border-rose-500/50 bg-rose-500/15 text-rose-300"
+                      : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
+                  }`}
+                >
+                  {data.audience === a && <Check className="w-2.5 h-2.5 inline mr-1" />}{a}
+                </button>
+              ))}
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Style prompt (optional)</Label>
+          </CardContent>
+        </Card>
+
+        {/* Common Music Style — full width, prominent */}
+        <Card className="md:col-span-2 border-violet-500/30 bg-violet-500/5">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Music2 className="w-4 h-4 text-violet-400 shrink-0" />
+              <Label className="text-sm font-semibold text-violet-300">Common Music Style</Label>
+              <span className="text-xs text-muted-foreground ml-1">(applied to every track in this album)</span>
+            </div>
+            <Textarea
+              value={data.stylePrompt}
+              onChange={(e) => onChange({ stylePrompt: e.target.value })}
+              rows={2}
+              placeholder="e.g. acoustic guitar, warm orchestral strings, nostalgic cinematic, female solo vocal, slow ballad, 80 BPM, reverb…"
+              className="resize-none text-sm bg-background/60"
+            />
+            <p className="text-xs text-muted-foreground">
+              Each track can still have its own extra style on the Track List step — they will be merged with this common style.
+            </p>
+
+            {/* Brand name for album cover */}
+            <div className="pt-2 border-t border-border/40 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <Label className="text-xs font-semibold text-amber-300">Channel / Brand Name</Label>
+                <span className="text-xs text-muted-foreground ml-1">(shown at the bottom of the album cover thumbnail)</span>
+              </div>
               <Input
-                value={data.stylePrompt}
-                onChange={(e) => onChange({ stylePrompt: e.target.value })}
-                placeholder="e.g. acoustic guitar, warm, nostalgic, female vocal..."
-                className="h-8 text-xs"
+                value={data.brandName ?? ""}
+                onChange={(e) => onChange({ brandName: e.target.value })}
+                placeholder="e.g. Eternal Melodies, Chill Vibes Music…"
+                className="h-8 text-xs bg-background/60"
               />
             </div>
           </CardContent>

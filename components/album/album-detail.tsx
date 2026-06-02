@@ -28,16 +28,17 @@ type Track = {
 }
 
 type Album = {
-  id:           string
-  title:        string
-  theme:        string | null
-  genre:        string | null
-  mood:         string | null
-  language:     string
-  stylePrompt:  string | null
-  status:       string
-  updatedAt:    Date
-  tracks:       Track[]
+  id:             string
+  title:          string
+  theme:          string | null
+  genre:          string | null
+  mood:           string | null
+  language:       string
+  stylePrompt:    string | null
+  coverImageUrl:  string | null
+  status:         string
+  updatedAt:      Date
+  tracks:         Track[]
 }
 
 const STATUS_CFG: Record<string, { label: string; color: string }> = {
@@ -105,16 +106,35 @@ export function AlbumDetail({ album }: { album: Album }) {
     })
   }
 
+  const [coverUrl, setCoverUrl] = useState(album.coverImageUrl ?? "")
+
   return (
     <div className="space-y-6">
       {/* Album header */}
-      <Card className="border-border/60 bg-gradient-to-br from-violet-500/5 to-background">
+      <Card className="border-border/60 overflow-hidden bg-gradient-to-br from-violet-500/5 to-background">
+        {/* Cover banner — full-width if available */}
+        {coverUrl && (
+          <div className="relative w-full aspect-video max-h-80 overflow-hidden group">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={coverUrl} alt="Album cover" className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+            <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+              <a href={coverUrl} download={`${album.title}-cover.jpg`} target="_blank" rel="noopener noreferrer">
+                <Button size="sm" variant="outline" className="gap-1.5 bg-black/40 border-white/20 text-white hover:bg-black/60">
+                  <Download className="w-3.5 h-3.5" /> Download Cover
+                </Button>
+              </a>
+            </div>
+          </div>
+        )}
         <CardContent className="p-6 space-y-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-violet-500/15 flex items-center justify-center">
-                <Disc3 className="w-7 h-7 text-violet-400" />
-              </div>
+              {!coverUrl && (
+                <div className="w-14 h-14 rounded-2xl bg-violet-500/15 flex items-center justify-center shrink-0">
+                  <Disc3 className="w-7 h-7 text-violet-400" />
+                </div>
+              )}
               <div>
                 <div className="flex items-center gap-2 mb-0.5">
                   <h1 className="text-2xl font-bold">{album.title}</h1>

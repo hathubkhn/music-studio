@@ -5,14 +5,18 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
 import {
   ArrowLeft, Play, Pause, Download, Loader2, CheckCircle2,
   AlertCircle, Zap, Music2, Package, ArrowRight, Image as ImageIcon,
+  Sparkles, Pencil, RefreshCw,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import type { AlbumData, AlbumTrack } from "./album-create-flow"
 import { generateTrackImage } from "@/lib/composite-track-image"
+import { generateAlbumThumbnail } from "@/lib/generate-album-thumbnail"
 
 interface Props {
   data: AlbumData
@@ -30,6 +34,18 @@ type TrackJobState = {
   errorMsg?:    string
 }
 
+/** Build default thumbnail prompt from album metadata */
+function buildDefaultThumbPrompt(data: AlbumData): string {
+  const parts = [
+    data.mood   ? `${data.mood.toLowerCase()} atmosphere` : null,
+    data.genre  ? `${data.genre.toLowerCase()} music` : null,
+    data.theme  ? data.theme.slice(0, 80) : null,
+    "cinematic wide shot, no people, no text, ultra HD, moody dramatic lighting, beautiful scenery",
+    "suitable for music album cover",
+  ].filter(Boolean)
+  return parts.join(", ")
+}
+
 export function AlbumGenerate({ data, onChange, onBack, onFinish }: Props) {
   const router = useRouter()
   const [albumId, setAlbumId]     = useState<string | null>(null)
@@ -42,6 +58,12 @@ export function AlbumGenerate({ data, onChange, onBack, onFinish }: Props) {
   const pollTimers = useRef<Map<number, NodeJS.Timeout>>(new Map())
   const [playingIdx, setPlayingIdx] = useState<number | null>(null)
   const audioEls = useRef<Map<number, HTMLAudioElement>>(new Map())
+
+  // Album thumbnail state
+  const [thumbPrompt, setThumbPrompt] = useState(data.thumbnailPrompt ?? "")
+  const [thumbStatus, setThumbStatus] = useState<"idle" | "generating" | "done" | "failed">("idle")
+  const [thumbProgress, setThumbProgress] = useState("")
+  const [thumbUrl, setThumbUrl]           = useState(data.coverImageUrl ?? "")
 
   const completedCount = jobs.filter((j) => j.status === "completed").length
   const failedCount    = jobs.filter((j) => j.status === "failed").length
@@ -139,7 +161,7 @@ export function AlbumGenerate({ data, onChange, onBack, onFinish }: Props) {
             trackTitle:  track.title,
             trackOrder:  track.order,
             lyrics:      track.lyrics,
-            stylePrompt: track.stylePrompt ?? data.stylePrompt,
+            stylePrompt: [data.stylePrompt, track.stylePrompt].filter(Boolean).join(", ") || undefined,
             albumTheme:  data.theme,
             albumMood:   data.mood,
             albumGenre:  data.genre,
@@ -191,7 +213,7 @@ export function AlbumGenerate({ data, onChange, onBack, onFinish }: Props) {
         body: JSON.stringify({
           title:       track.title,
           lyrics:      track.lyrics ?? "",
-          stylePrompt: track.stylePrompt ?? data.stylePrompt,
+          stylePrompt: [data.stylePrompt, track.stylePrompt].filter(Boolean).join(", ") || undefined,
         }),
       })
       if (!res.ok) throw new Error((await res.json()).error || "Failed")
@@ -247,22 +269,57 @@ export function AlbumGenerate({ data, onChange, onBack, onFinish }: Props) {
     }
   }, [])
 
-  // Auto-redirect countdown when all done
+  // Set default thumb prompt once we know album data
+  useEffect(() => {
+    if (!thumbPrompt && data.title) {
+      setThumbPrompt(buildDefaultThumbPrompt(data))
+    }
+  }, [data.title]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-redirect countdown when all done (no auto-redirect — user controls after thumbnail)
   useEffect(() => {
     if (!allDone || !albumId) return
-    setCountdown(5)
-    const tick = setInterval(() => {
-      setCountdown((c) => {
-        if (c === null || c <= 1) {
-          clearInterval(tick)
-          onFinish(albumId)
-          return null
-        }
-        return c - 1
+    // Start countdown only if thumbnail was already generated or not needed
+    if (thumbStatus === "done" || thumbStatus === "idle") {
+      setCountdown(8)
+    }
+  }, [allDone, albumId, thumbStatus]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (countdown === null) return
+    if (countdown <= 0) { onFinish(albumId!); return }
+    const t = setTimeout(() => setCountdown((c) => (c !== null ? c - 1 : null)), 1000)
+    return () => clearTimeout(t)
+  }, [countdown]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Generate album cover thumbnail ────────────────────────────────────────
+  const generateCover = useCallback(async () => {
+    if (!albumId) return
+    setThumbStatus("generating")
+    setCountdown(null) // pause any countdown
+    onChange({ thumbnailPrompt: thumbPrompt })
+    try {
+      const url = await generateAlbumThumbnail({
+        albumId,
+        albumTitle:  data.title,
+        genre:       data.genre,
+        mood:        data.mood,
+        theme:       data.theme,
+        brandName:   data.brandName,
+        tracks:      data.tracks.map((t) => ({ order: t.order, title: t.title })),
+        onProgress:  (msg) => setThumbProgress(msg),
       })
-    }, 1000)
-    return () => clearInterval(tick)
-  }, [allDone, albumId]) // eslint-disable-line react-hooks/exhaustive-deps
+      setThumbUrl(url)
+      setThumbStatus("done")
+      onChange({ coverImageUrl: url })
+      toast.success("Album cover generated!")
+      // Start countdown after cover is done
+      setCountdown(5)
+    } catch (err) {
+      setThumbStatus("failed")
+      toast.error(err instanceof Error ? err.message : "Cover generation failed")
+    }
+  }, [albumId, thumbPrompt, data, onChange])
 
   // ── Audio playback ────────────────────────────────────────────────────────
   const togglePlay = (idx: number, url: string) => {
@@ -334,11 +391,11 @@ export function AlbumGenerate({ data, onChange, onBack, onFinish }: Props) {
             <CheckCircle2 className="w-5 h-5 text-teal-400" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-teal-300">Album generated successfully!</p>
+            <p className="font-semibold text-teal-300">All tracks generated!</p>
             <p className="text-xs text-teal-400/70 mt-0.5">
-              {countdown !== null
-                ? `Redirecting to album in ${countdown}s…`
-                : "All tracks and thumbnails are ready."}
+              {thumbStatus === "done"
+                ? countdown !== null ? `Redirecting to album in ${countdown}s…` : "Album cover is ready."
+                : "Generate your album cover below, then open the album."}
             </p>
           </div>
           <Button
@@ -350,6 +407,85 @@ export function AlbumGenerate({ data, onChange, onBack, onFinish }: Props) {
             Open Album <ArrowRight className="w-3.5 h-3.5" />
           </Button>
         </div>
+      )}
+
+      {/* Album Cover Thumbnail Generator */}
+      {allDone && albumId && (
+        <Card className="border-violet-500/30 bg-violet-500/5">
+          <CardContent className="p-4 space-y-4">
+            <div className="flex items-center gap-2">
+              <ImageIcon className="w-4 h-4 text-violet-400" />
+              <span className="font-semibold text-sm text-violet-300">Album Cover Thumbnail</span>
+              <span className="text-xs text-muted-foreground ml-1">
+                YouTube-style cover with full tracklist
+              </span>
+            </div>
+
+            {/* Show generated cover */}
+            {thumbUrl && (
+              <div className="rounded-lg overflow-hidden border border-border/40 aspect-video relative group">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={thumbUrl} alt="Album cover" className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <a
+                    href={thumbUrl}
+                    download={`${data.title}-cover.jpg`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button variant="outline" size="sm" className="gap-1.5">
+                      <Download className="w-3.5 h-3.5" /> Download
+                    </Button>
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {/* Editable prompt */}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                <Label className="text-xs text-muted-foreground">Background image prompt (editable)</Label>
+              </div>
+              <Textarea
+                value={thumbPrompt}
+                onChange={(e) => setThumbPrompt(e.target.value)}
+                rows={3}
+                disabled={thumbStatus === "generating"}
+                className="resize-none text-xs bg-background/60"
+                placeholder="Describe the background image for your album cover…"
+              />
+            </div>
+
+            {thumbStatus === "generating" && (
+              <div className="flex items-center gap-2 text-sm text-violet-300">
+                <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                <span>{thumbProgress || "Generating album cover…"}</span>
+              </div>
+            )}
+            {thumbStatus === "failed" && (
+              <p className="text-xs text-destructive">Cover generation failed. Check your image API and try again.</p>
+            )}
+
+            <div className="flex gap-2">
+              <Button
+                variant={thumbStatus === "done" ? "outline" : "gradient"}
+                size="sm"
+                disabled={thumbStatus === "generating" || !thumbPrompt.trim()}
+                onClick={generateCover}
+                className="gap-2"
+              >
+                {thumbStatus === "generating" ? (
+                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</>
+                ) : thumbStatus === "done" ? (
+                  <><RefreshCw className="w-3.5 h-3.5" /> Regenerate Cover</>
+                ) : (
+                  <><Sparkles className="w-3.5 h-3.5" /> Generate Album Cover</>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Track list with status */}

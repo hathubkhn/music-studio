@@ -28,10 +28,13 @@ export type AlbumData = {
   genre: string
   mood: string
   language: string
-  stylePrompt: string
+  stylePrompt: string     // common music style applied to ALL tracks
   audience: string
   numTracks: number
   targetDurationMin?: number  // total album duration target in minutes
+  brandName?: string          // channel / brand name shown at bottom of album cover
+  coverImageUrl?: string      // generated album thumbnail URL
+  thumbnailPrompt?: string    // editable prompt for album cover generation
   tracks: AlbumTrack[]
 }
 
@@ -54,6 +57,9 @@ export function AlbumCreateFlow() {
     audience: "General",
     numTracks: 5,
     targetDurationMin: undefined,
+    brandName: "",
+    coverImageUrl: undefined,
+    thumbnailPrompt: undefined,
     tracks: [],
   })
 
