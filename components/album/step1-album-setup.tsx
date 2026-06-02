@@ -12,7 +12,15 @@ const GENRES = ["Pop","Rock","Hip-Hop","R&B","Jazz","Electronic","K-Pop","Folk",
 const MOODS  = ["Uplifting","Sad","Romantic","Energetic","Calm","Nostalgic","Epic","Playful","Dark","Motivational"]
 const LANGUAGES = ["Vietnamese","English","Korean","Japanese","Chinese","Spanish","French","Thai","Indonesian","Portuguese"]
 const AUDIENCES = ["Children (3–6)","Kids (6–12)","Teens","Young Adults","General","Adults","Seniors"]
-const TRACK_COUNTS = [3, 4, 5, 6, 7, 8, 10]
+const TRACK_COUNTS = [3, 4, 5, 6, 7, 8, 10, 12, 15, 20]
+const DURATION_PRESETS = [
+  { label: "15 min", value: 15 },
+  { label: "30 min", value: 30 },
+  { label: "45 min", value: 45 },
+  { label: "1 hour", value: 60 },
+  { label: "90 min", value: 90 },
+  { label: "2 hours", value: 120 },
+]
 
 interface Props {
   data: AlbumData
@@ -164,29 +172,59 @@ export function AlbumSetup({ data, onChange, onNext }: Props) {
           </CardContent>
         </Card>
 
-        {/* Number of tracks */}
+        {/* Number of tracks + duration */}
         <Card className="md:col-span-2 border-border/60">
-          <CardContent className="p-4 space-y-2">
-            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Number of Tracks
-            </Label>
-            <div className="flex gap-2">
-              {TRACK_COUNTS.map((n) => (
-                <button key={n} type="button" onClick={() => onChange({ numTracks: n })}
-                  className={`w-12 h-12 rounded-lg border text-sm font-bold transition-all ${
-                    data.numTracks === n
-                      ? "border-violet-500/50 bg-violet-500/15 text-violet-300"
-                      : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
-                  }`}
-                >
-                  {n}
-                </button>
-              ))}
+          <CardContent className="p-4 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Number of Tracks
+              </Label>
+              <div className="flex flex-wrap gap-2">
+                {TRACK_COUNTS.map((n) => (
+                  <button key={n} type="button" onClick={() => onChange({ numTracks: n })}
+                    className={`w-12 h-12 rounded-lg border text-sm font-bold transition-all ${
+                      data.numTracks === n
+                        ? "border-violet-500/50 bg-violet-500/15 text-violet-300"
+                        : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {data.numTracks} tracks × ~2 min = approx{" "}
-              <strong className="text-foreground">{data.numTracks * 2}–{data.numTracks * 4} min</strong> total video
-            </p>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Target Album Duration
+              </Label>
+              <div className="flex flex-wrap gap-2">
+                {DURATION_PRESETS.map((p) => (
+                  <button key={p.value} type="button"
+                    onClick={() => onChange({ targetDurationMin: data.targetDurationMin === p.value ? undefined : p.value })}
+                    className={`px-3 h-8 rounded-lg border text-xs font-medium transition-all ${
+                      data.targetDurationMin === p.value
+                        ? "border-teal-500/50 bg-teal-500/15 text-teal-300"
+                        : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {data.targetDurationMin
+                  ? <>
+                      {data.numTracks} tracks × ~{Math.round(data.targetDurationMin / data.numTracks)} min/song = <strong className="text-foreground">{data.targetDurationMin} min</strong> total.
+                      {data.targetDurationMin >= 45 && <span className="text-amber-400"> AI will write extended lyrics for longer songs.</span>}
+                      {data.numTracks >= 10 && <span className="text-violet-400"> Download per-track WebMs and combine in CapCut for best results.</span>}
+                    </>
+                  : <>
+                      {data.numTracks} tracks · AI decides song length. Select a duration for longer songs.
+                    </>
+                }
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>

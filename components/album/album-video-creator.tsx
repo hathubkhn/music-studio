@@ -306,6 +306,21 @@ export function AlbumVideoCreator({ tracks, albumTitle, albumMood, albumGenre, v
             Import into CapCut, Premiere Pro, or DaVinci Resolve for final editing.
           </p>
         )}
+
+        {/* Long-form recommendation */}
+        {readyTracks.length >= 8 && phase.kind === "idle" && (
+          <div className="border border-amber-500/20 bg-amber-500/5 rounded-lg p-3 space-y-1.5">
+            <p className="text-xs font-medium text-amber-400">Recommended for long albums ({readyTracks.length} tracks)</p>
+            <p className="text-xs text-muted-foreground">
+              Recording all {readyTracks.length} tracks in one browser session (~{readyTracks.length * 4}+ min) risks
+              memory issues. Instead, create individual videos per track using the 🎬 button on each track row,
+              then combine them in CapCut using this chapter order:
+            </p>
+            <pre className="text-[10px] text-muted-foreground/70 font-mono">
+              {readyTracks.map((t, i) => `${String(i + 1).padStart(2, "0")}. ${t.title}`).join("\n")}
+            </pre>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

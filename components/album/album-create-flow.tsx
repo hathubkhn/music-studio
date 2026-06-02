@@ -31,6 +31,7 @@ export type AlbumData = {
   stylePrompt: string
   audience: string
   numTracks: number
+  targetDurationMin?: number  // total album duration target in minutes
   tracks: AlbumTrack[]
 }
 
@@ -52,6 +53,7 @@ export function AlbumCreateFlow() {
     stylePrompt: "",
     audience: "General",
     numTracks: 5,
+    targetDurationMin: undefined,
     tracks: [],
   })
 

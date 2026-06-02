@@ -31,13 +31,14 @@ export function AlbumTrackList({ data, onChange, onNext, onBack }: Props) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          theme:      data.theme,
-          genre:      data.genre,
-          mood:       data.mood,
-          language:   data.language,
-          numTracks:  data.numTracks,
-          stylePrompt:data.stylePrompt,
-          audience:   data.audience,
+          theme:             data.theme,
+          genre:             data.genre,
+          mood:              data.mood,
+          language:          data.language,
+          numTracks:         data.numTracks,
+          stylePrompt:       data.stylePrompt,
+          audience:          data.audience,
+          targetDurationMin: data.targetDurationMin,
         }),
       })
       if (!res.ok) throw new Error((await res.json()).error || "Failed")
