@@ -49,17 +49,18 @@ enum AlbumStatus {
 }
 
 model AlbumTrack {
-  id          String      @id @default(cuid())
-  albumId     String
-  order       Int
-  title       String
-  description String?     @db.Text
-  lyrics      String?     @db.Text
-  stylePrompt String?     @db.Text
-  audioUrl    String?
-  audioJobId  String?
-  duration    Float?
-  status      TrackStatus @default(PENDING)
+  id           String      @id @default(cuid())
+  albumId      String
+  order        Int
+  title        String
+  description  String?     @db.Text
+  lyrics       String?     @db.Text
+  stylePrompt  String?     @db.Text
+  audioUrl     String?
+  audioJobId   String?
+  thumbnailUrl String?
+  duration     Float?
+  status       TrackStatus @default(PENDING)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 

@@ -23,6 +23,7 @@ const MODEL_LIMITS: Record<string, { prompt: number; style: number; title: numbe
   V4_5PLUS:{ prompt: 5000, style: 1000, title: 100 },
   V4_5ALL: { prompt: 5000, style: 1000, title: 80  },
   V5:      { prompt: 5000, style: 1000, title: 100 },
+  V5_5:    { prompt: 5000, style: 1000, title: 100 },
 }
 
 function getLimits(model: string) {

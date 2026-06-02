@@ -29,13 +29,14 @@ const patchSchema = z.object({
   coverImageUrl: z.string().optional(),
   // Patch a single track
   track: z.object({
-    id:        z.string(),
-    audioUrl:  z.string().optional(),
-    audioJobId:z.string().optional(),
-    duration:  z.number().optional(),
-    status:    z.enum(["PENDING", "GENERATING", "COMPLETED", "FAILED"]).optional(),
-    lyrics:    z.string().optional(),
-    stylePrompt: z.string().optional(),
+    id:           z.string(),
+    audioUrl:     z.string().optional(),
+    audioJobId:   z.string().optional(),
+    duration:     z.number().optional(),
+    status:       z.enum(["PENDING", "GENERATING", "COMPLETED", "FAILED"]).optional(),
+    lyrics:       z.string().optional(),
+    stylePrompt:  z.string().optional(),
+    thumbnailUrl: z.string().optional(),
   }).optional(),
 })
 
@@ -62,12 +63,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (input.track) {
       const trackData: Record<string, unknown> = {}
       const t = input.track
-      if (t.audioUrl   !== undefined) trackData.audioUrl   = t.audioUrl
-      if (t.audioJobId !== undefined) trackData.audioJobId = t.audioJobId
-      if (t.duration   !== undefined) trackData.duration   = t.duration
-      if (t.status     !== undefined) trackData.status     = t.status
-      if (t.lyrics     !== undefined) trackData.lyrics     = t.lyrics
-      if (t.stylePrompt!== undefined) trackData.stylePrompt= t.stylePrompt
+      if (t.audioUrl    !== undefined) trackData.audioUrl    = t.audioUrl
+      if (t.audioJobId  !== undefined) trackData.audioJobId  = t.audioJobId
+      if (t.duration    !== undefined) trackData.duration    = t.duration
+      if (t.status      !== undefined) trackData.status      = t.status
+      if (t.lyrics      !== undefined) trackData.lyrics      = t.lyrics
+      if (t.stylePrompt !== undefined) trackData.stylePrompt = t.stylePrompt
+      if (t.thumbnailUrl!== undefined) trackData.thumbnailUrl= t.thumbnailUrl
 
       await prisma.albumTrack.update({ where: { id: t.id }, data: trackData })
     }

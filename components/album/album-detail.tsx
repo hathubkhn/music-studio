@@ -5,35 +5,39 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
-  Disc3, Music2, Play, Pause, Download, ChevronDown,
-  ChevronUp, CheckCircle2, AlertCircle, Clock, Package, Film, X
+  Disc3, Music2, Play, Pause, Download, ChevronDown, ChevronUp,
+  CheckCircle2, AlertCircle, Clock, Package, Film, X, Image as ImageIcon,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { LyricVideoCreator } from "@/components/create-flow/lyric-video-creator"
+import { TrackImageEditor }  from "./track-image-editor"
+import { AlbumVideoCreator } from "./album-video-creator"
+import { DEFAULT_VIDEO_CONFIG } from "./album-video-utils"
 
 type Track = {
-  id: string
-  order: number
-  title: string
-  description: string | null
-  lyrics: string | null
-  stylePrompt: string | null
-  audioUrl: string | null
-  status: string
-  duration: number | null
+  id:           string
+  order:        number
+  title:        string
+  description:  string | null
+  lyrics:       string | null
+  stylePrompt:  string | null
+  audioUrl:     string | null
+  thumbnailUrl: string | null
+  status:       string
+  duration:     number | null
 }
 
 type Album = {
-  id: string
-  title: string
-  theme: string | null
-  genre: string | null
-  mood: string | null
-  language: string
-  stylePrompt: string | null
-  status: string
-  updatedAt: Date
-  tracks: Track[]
+  id:           string
+  title:        string
+  theme:        string | null
+  genre:        string | null
+  mood:         string | null
+  language:     string
+  stylePrompt:  string | null
+  status:       string
+  updatedAt:    Date
+  tracks:       Track[]
 }
 
 const STATUS_CFG: Record<string, { label: string; color: string }> = {
@@ -50,30 +54,36 @@ const TRACK_STATUS_CFG: Record<string, { label: string; color: string }> = {
 }
 
 export function AlbumDetail({ album }: { album: Album }) {
-  const [expandedTrack, setExpandedTrack] = useState<string | null>(null)
-  const [videoTrackId, setVideoTrackId]   = useState<string | null>(null)
-  const [playingTrackId, setPlayingTrackId] = useState<string | null>(null)
+  const [tracks, setTracks]             = useState<Track[]>(album.tracks)
+  const [expandedTrack, setExpanded]    = useState<string | null>(null)
+  const [imageTrackId, setImageTrackId] = useState<string | null>(null)
+  const [videoTrackId, setVideoTrackId] = useState<string | null>(null)
+  const [playingTrackId, setPlaying]    = useState<string | null>(null)
+  const [showAlbumVideo, setShowAlbumVideo] = useState(false)
   const audioEls = useRef<Map<string, HTMLAudioElement>>(new Map())
 
-  const completedTracks = album.tracks.filter((t) => t.status === "COMPLETED")
+  const completedTracks = tracks.filter((t) => t.status === "COMPLETED")
   const cfg = STATUS_CFG[album.status] ?? STATUS_CFG.DRAFT
+
+  const updateThumbnail = (trackId: string, url: string) => {
+    setTracks((prev) => prev.map((t) => t.id === trackId ? { ...t, thumbnailUrl: url || null } : t))
+  }
 
   const togglePlay = (trackId: string, url: string) => {
     if (playingTrackId === trackId) {
       audioEls.current.get(trackId)?.pause()
-      setPlayingTrackId(null)
+      setPlaying(null)
       return
     }
     if (playingTrackId) audioEls.current.get(playingTrackId)?.pause()
-
     let el = audioEls.current.get(trackId)
     if (!el) {
       el = new Audio(url)
-      el.onended = () => setPlayingTrackId(null)
+      el.onended = () => setPlaying(null)
       audioEls.current.set(trackId, el)
     }
     el.play()
-    setPlayingTrackId(trackId)
+    setPlaying(trackId)
   }
 
   const downloadAll = () => {
@@ -106,11 +116,13 @@ export function AlbumDetail({ album }: { album: Album }) {
                 )}
               </div>
             </div>
-            {completedTracks.length > 0 && (
-              <Button variant="outline" className="gap-2 shrink-0" onClick={downloadAll}>
-                <Package className="w-4 h-4" />Download All ({completedTracks.length})
-              </Button>
-            )}
+            <div className="flex items-center gap-2 shrink-0">
+              {completedTracks.length > 0 && (
+                <Button variant="outline" className="gap-2" onClick={downloadAll}>
+                  <Package className="w-4 h-4" />Download All ({completedTracks.length})
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Meta pills */}
@@ -127,13 +139,13 @@ export function AlbumDetail({ album }: { album: Album }) {
           {/* Progress bar */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{completedTracks.length} of {album.tracks.length} tracks ready</span>
-              <span>{Math.round((completedTracks.length / album.tracks.length) * 100)}%</span>
+              <span>{completedTracks.length} of {tracks.length} tracks ready</span>
+              <span>{Math.round((completedTracks.length / tracks.length) * 100)}%</span>
             </div>
             <div className="w-full bg-muted rounded-full h-2">
               <div
                 className="h-full bg-gradient-to-r from-violet-500 to-teal-500 rounded-full transition-all"
-                style={{ width: `${(completedTracks.length / album.tracks.length) * 100}%` }}
+                style={{ width: `${(completedTracks.length / tracks.length) * 100}%` }}
               />
             </div>
           </div>
@@ -144,19 +156,25 @@ export function AlbumDetail({ album }: { album: Album }) {
       <div>
         <h2 className="text-base font-semibold mb-3">Track List</h2>
         <div className="space-y-2">
-          {album.tracks.map((track) => {
+          {tracks.map((track) => {
             const isExpanded   = expandedTrack === track.id
+            const isImageOpen  = imageTrackId  === track.id
+            const isVideoOpen  = videoTrackId  === track.id
             const isPlaying    = playingTrackId === track.id
             const trackCfg     = TRACK_STATUS_CFG[track.status] ?? TRACK_STATUS_CFG.PENDING
 
             return (
-              <Card key={track.id} className={`border-border/60 overflow-hidden transition-all ${track.status === "COMPLETED" ? "border-teal-500/20" : track.status === "FAILED" ? "border-destructive/20" : ""}`}>
+              <Card key={track.id} className={`border-border/60 overflow-hidden transition-all ${
+                track.status === "COMPLETED"
+                  ? "border-teal-500/20"
+                  : track.status === "FAILED"
+                  ? "border-destructive/20"
+                  : ""
+              }`}>
                 {/* Header row */}
                 <div className="flex items-center gap-3 p-3">
-                  {/* Play btn or status */}
                   {track.audioUrl ? (
-                    <button
-                      type="button"
+                    <button type="button"
                       onClick={() => togglePlay(track.id, track.audioUrl!)}
                       className="w-8 h-8 rounded-full bg-teal-500/15 flex items-center justify-center text-teal-400 hover:bg-teal-500/25 transition-colors shrink-0"
                     >
@@ -172,6 +190,18 @@ export function AlbumDetail({ album }: { album: Album }) {
                     </div>
                   )}
 
+                  {/* Thumbnail mini */}
+                  {track.thumbnailUrl ? (
+                    <div className="w-10 h-10 rounded overflow-hidden border border-border/40 shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={track.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="w-10 h-10 rounded border border-dashed border-border/40 bg-muted/30 flex items-center justify-center shrink-0">
+                      <ImageIcon className="w-4 h-4 text-muted-foreground/30" />
+                    </div>
+                  )}
+
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground shrink-0">#{track.order}</span>
@@ -183,26 +213,33 @@ export function AlbumDetail({ album }: { album: Album }) {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1 shrink-0">
+                    {/* Image editor toggle */}
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-400 hover:bg-amber-500/10"
+                      title="Edit thumbnail"
+                      onClick={() => setImageTrackId(isImageOpen ? null : track.id)}
+                    >
+                      <ImageIcon className="w-3.5 h-3.5" />
+                    </Button>
+
                     {track.audioUrl && (
-                    <>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-violet-400 hover:bg-violet-500/10"
-                        title="Create lyric video"
-                        onClick={() => setVideoTrackId(videoTrackId === track.id ? null : track.id)}
-                      >
-                        <Film className="w-3.5 h-3.5" />
-                      </Button>
-                      <a href={track.audioUrl} download={`${String(track.order).padStart(2, "0")}-${track.title}.mp3`}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                          <Download className="w-3.5 h-3.5" />
+                      <>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-violet-400 hover:bg-violet-500/10"
+                          title="Create lyric video"
+                          onClick={() => setVideoTrackId(isVideoOpen ? null : track.id)}
+                        >
+                          <Film className="w-3.5 h-3.5" />
                         </Button>
-                      </a>
-                    </>
-                  )}
+                        <a href={track.audioUrl} download={`${String(track.order).padStart(2, "0")}-${track.title}.mp3`}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                            <Download className="w-3.5 h-3.5" />
+                          </Button>
+                        </a>
+                      </>
+                    )}
                     {track.lyrics && (
-                      <button
-                        type="button"
-                        onClick={() => setExpandedTrack(isExpanded ? null : track.id)}
+                      <button type="button"
+                        onClick={() => setExpanded(isExpanded ? null : track.id)}
                         className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
                       >
                         {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -211,8 +248,36 @@ export function AlbumDetail({ album }: { album: Album }) {
                   </div>
                 </div>
 
-                {/* Lyric Video Creator */}
-                {videoTrackId === track.id && (
+                {/* Image editor panel */}
+                {isImageOpen && (
+                  <CardContent className="px-4 pb-4 pt-0 border-t border-amber-500/20 bg-amber-500/3">
+                    <div className="flex items-center justify-between mb-3 pt-3">
+                      <p className="text-sm font-medium flex items-center gap-2">
+                        <ImageIcon className="w-4 h-4 text-amber-400" />
+                        Thumbnail — {track.title}
+                      </p>
+                      <button type="button" onClick={() => setImageTrackId(null)}
+                        className="text-muted-foreground hover:text-foreground">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <TrackImageEditor
+                      albumId={album.id}
+                      trackId={track.id}
+                      trackTitle={track.title}
+                      lyrics={track.lyrics}
+                      stylePrompt={track.stylePrompt}
+                      albumTheme={album.theme}
+                      albumMood={album.mood}
+                      albumGenre={album.genre}
+                      initialUrl={track.thumbnailUrl}
+                      onSaved={(url) => updateThumbnail(track.id, url)}
+                    />
+                  </CardContent>
+                )}
+
+                {/* Lyric Video Creator panel */}
+                {isVideoOpen && (
                   <CardContent className="px-4 pb-4 pt-0 border-t border-violet-500/20 bg-violet-500/3">
                     <div className="flex items-center justify-between mb-3 pt-3">
                       <p className="text-sm font-medium flex items-center gap-2">
@@ -220,7 +285,7 @@ export function AlbumDetail({ album }: { album: Album }) {
                         Lyric Video — {track.title}
                       </p>
                       <button type="button" onClick={() => setVideoTrackId(null)}
-                        className="text-muted-foreground hover:text-foreground transition-colors">
+                        className="text-muted-foreground hover:text-foreground">
                         <X className="w-4 h-4" />
                       </button>
                     </div>
@@ -231,6 +296,8 @@ export function AlbumDetail({ album }: { album: Album }) {
                       mood={album.mood ?? ""}
                       genre={album.genre ?? ""}
                       visualStyle={album.theme ?? ""}
+                      existingImageUrl={track.thumbnailUrl ?? undefined}
+                      audioDuration={track.duration ?? undefined}
                     />
                   </CardContent>
                 )}
@@ -238,16 +305,14 @@ export function AlbumDetail({ album }: { album: Album }) {
                 {/* Expanded lyrics */}
                 {isExpanded && track.lyrics && (
                   <CardContent className="px-4 pb-4 pt-0 border-t border-border/40">
-                    <div className="space-y-2">
-                      {track.stylePrompt && (
-                        <p className="text-xs text-muted-foreground bg-muted/50 rounded px-3 py-2">
-                          <span className="font-medium">Style:</span> {track.stylePrompt}
-                        </p>
-                      )}
-                      <pre className="text-xs font-mono text-foreground/80 whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto">
-                        {track.lyrics}
-                      </pre>
-                    </div>
+                    {track.stylePrompt && (
+                      <p className="text-xs text-muted-foreground bg-muted/50 rounded px-3 py-2 mb-2">
+                        <span className="font-medium">Style:</span> {track.stylePrompt}
+                      </p>
+                    )}
+                    <pre className="text-xs font-mono text-foreground/80 whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto">
+                      {track.lyrics}
+                    </pre>
                   </CardContent>
                 )}
               </Card>
@@ -256,24 +321,36 @@ export function AlbumDetail({ album }: { album: Album }) {
         </div>
       </div>
 
-      {/* Playlist note */}
-      {completedTracks.length > 1 && (
-        <Card className="border-teal-500/20 bg-teal-500/5">
-          <CardContent className="p-4 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium">
-                {completedTracks.length} tracks ready for video!
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Download all audio files and combine in your video editor (CapCut, Premiere, DaVinci).
-                Est. total duration: {completedTracks.length * 2}–{completedTracks.length * 4} min.
-              </p>
-            </div>
-            <Button variant="gradient" className="gap-2 shrink-0" onClick={downloadAll}>
-              <Package className="w-4 h-4" />Download All
-            </Button>
-          </CardContent>
-        </Card>
+      {/* Album Video section */}
+      {completedTracks.length > 0 && (
+        <div className="space-y-3">
+          <button type="button"
+            onClick={() => setShowAlbumVideo(!showAlbumVideo)}
+            className="flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Film className="w-4 h-4 text-violet-400" />
+            Full Album Video
+            {showAlbumVideo ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+
+          {showAlbumVideo && (
+            <AlbumVideoCreator
+              tracks={tracks.map((t) => ({
+                id:           t.id,
+                order:        t.order,
+                title:        t.title,
+                audioUrl:     t.audioUrl,
+                thumbnailUrl: t.thumbnailUrl,
+                lyrics:       t.lyrics,
+                duration:     t.duration,
+              }))}
+              albumTitle={album.title}
+              albumMood={album.mood}
+              albumGenre={album.genre}
+              videoConfig={DEFAULT_VIDEO_CONFIG}
+            />
+          )}
+        </div>
       )}
     </div>
   )
