@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { handleUpload } from "@vercel/blob/client"
 
 const ALLOWED_TYPES = [
+  // Audio
   "audio/mpeg", "audio/mp3",
   "audio/mp4", "audio/x-m4a",
   "audio/wav", "audio/x-wav",
@@ -10,6 +11,10 @@ const ALLOWED_TYPES = [
   "audio/flac", "audio/x-flac",
   "audio/aac", "audio/x-aac",
   "audio/webm",
+  // Images (used by composite-track-image thumbnail uploads)
+  "image/jpeg", "image/jpg",
+  "image/png", "image/webp",
+  "image/gif",
 ]
 
 /**
@@ -17,6 +22,7 @@ const ALLOWED_TYPES = [
  *   1. Token request — client asks for a signed upload URL (tiny JSON, no file bytes here)
  *   2. Completion callback — Vercel Blob notifies us the upload finished
  *
+ * Used for both audio uploads and image thumbnail uploads.
  * The actual file bytes travel DIRECTLY from the browser to Vercel Blob's edge —
  * they never pass through this function, so the 4.5 MB Vercel limit is irrelevant.
  */
