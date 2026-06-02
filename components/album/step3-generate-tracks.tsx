@@ -316,7 +316,7 @@ export function AlbumGenerate({ data, onChange, onBack, onFinish }: Props) {
                       >
                         {playingIdx === i ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 ml-0.5" />}
                       </button>
-                      <a href={job.audioUrl} download={`${track.title}.mp3`}>
+                      <a href={`/api/proxy/audio?url=${encodeURIComponent(job.audioUrl!)}&filename=${encodeURIComponent(`${track.title}.mp3`)}&download=1`} download={`${track.title}.mp3`}>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
                           <Download className="w-3.5 h-3.5" />
                         </Button>

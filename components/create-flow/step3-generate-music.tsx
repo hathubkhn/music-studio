@@ -329,7 +329,7 @@ export function Step3GenerateMusic({ data, onNext, onBack }: Props) {
                   <div className="h-full bg-emerald-500 w-1/3 rounded-full" />
                 </div>
               </div>
-              <a href={audioUrl} download={`${data.title}.mp3`}>
+              <a href={`/api/proxy/audio?url=${encodeURIComponent(audioUrl!)}&filename=${encodeURIComponent(`${data.title}.mp3`)}&download=1`} download={`${data.title}.mp3`}>
                 <Button variant="outline" size="sm" className="gap-1.5">
                   <Download className="h-3.5 w-3.5" />
                   Download

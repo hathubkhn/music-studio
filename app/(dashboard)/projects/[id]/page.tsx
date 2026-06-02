@@ -169,7 +169,7 @@ export default async function ProjectDetailPage({
                       <p className="text-xs text-muted-foreground line-clamp-1">{finalLyrics.stylePrompt}</p>
                     )}
                   </div>
-                  <a href={audioAsset.url} download={`${project.title}.mp3`}>
+                  <a href={`/api/proxy/audio?url=${encodeURIComponent(audioAsset.url)}&filename=${encodeURIComponent(`${project.title}.mp3`)}&download=1`} download={`${project.title}.mp3`}>
                     <Button variant="outline" size="sm" className="gap-1.5">
                       <Download className="h-3.5 w-3.5" />
                       Download

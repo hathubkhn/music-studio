@@ -86,13 +86,22 @@ export function AlbumDetail({ album }: { album: Album }) {
     setPlaying(trackId)
   }
 
+  const proxyDownloadUrl = (audioUrl: string, filename: string) => {
+    const safe = filename.replace(/[^\w.\- ]/g, "_")
+    return `/api/proxy/audio?url=${encodeURIComponent(audioUrl)}&filename=${encodeURIComponent(safe)}&download=1`
+  }
+
   const downloadAll = () => {
-    completedTracks.forEach((track) => {
+    completedTracks.forEach((track, i) => {
       if (!track.audioUrl) return
-      const a = document.createElement("a")
-      a.href     = track.audioUrl
-      a.download = `${String(track.order).padStart(2, "0")}-${track.title}.mp3`
-      a.click()
+      const filename = `${String(track.order).padStart(2, "0")}-${track.title}.mp3`
+      // Stagger downloads slightly so browser doesn't block multiple simultaneous saves
+      setTimeout(() => {
+        const a = document.createElement("a")
+        a.href     = proxyDownloadUrl(track.audioUrl!, filename)
+        a.download = filename
+        a.click()
+      }, i * 800)
     })
   }
 
@@ -230,7 +239,10 @@ export function AlbumDetail({ album }: { album: Album }) {
                         >
                           <Film className="w-3.5 h-3.5" />
                         </Button>
-                        <a href={track.audioUrl} download={`${String(track.order).padStart(2, "0")}-${track.title}.mp3`}>
+                        <a
+                          href={proxyDownloadUrl(track.audioUrl!, `${String(track.order).padStart(2, "0")}-${track.title}.mp3`)}
+                          download={`${String(track.order).padStart(2, "0")}-${track.title}.mp3`}
+                        >
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
                             <Download className="w-3.5 h-3.5" />
                           </Button>
