@@ -594,7 +594,7 @@ export function LyricVideoCreator({
         {recordState === "idle" || recordState === "error" ? (
           <Button size="sm" variant="gradient" className="gap-1.5"
             onClick={recordVideo}
-            disabled={!audioUrl || recordState === "preparing"}
+            disabled={!audioUrl}
           >
             <Film className="w-3.5 h-3.5" />Create Video
           </Button>
