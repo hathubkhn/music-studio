@@ -1,9 +1,10 @@
 import { prisma } from "@/lib/db"
 import Link from "next/link"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Disc3, Music2, CheckCircle2, Loader2, Clock } from "lucide-react"
+import { Plus, Disc3, Music2, CheckCircle2, Loader2, Clock, Download } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 
 async function getOrCreateUser() {
@@ -72,31 +73,50 @@ export default async function AlbumsPage() {
             const cfg = STATUS_CFG[album.status]
             const completedTracks = album.tracks.filter((t) => t.status === "COMPLETED").length
             const totalTracks = album._count.tracks
+            const coverUrl = album.tracks.find((t) => t.thumbnailUrl)?.thumbnailUrl ?? null
 
             return (
               <Link key={album.id} href={`/albums/${album.id}`}>
-                <Card className="border-border/60 hover:border-violet-500/30 hover:shadow-md transition-all cursor-pointer group h-full">
-                  <CardContent className="p-5 space-y-4 flex flex-col h-full">
-                    {/* Header */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="w-10 h-10 rounded-lg bg-violet-500/15 flex items-center justify-center shrink-0">
-                        <Disc3 className="w-5 h-5 text-violet-400" />
+                <Card className="border-border/60 hover:border-violet-500/30 hover:shadow-md transition-all cursor-pointer group h-full overflow-hidden">
+                  {/* Cover art */}
+                  <div className="relative w-full aspect-video bg-gradient-to-br from-violet-900/40 to-indigo-900/40 overflow-hidden">
+                    {coverUrl ? (
+                      <Image
+                        src={coverUrl}
+                        alt={album.title}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-500"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Disc3 className="w-12 h-12 text-violet-400/40" />
                       </div>
-                      <Badge className={cfg.color}>{cfg.label}</Badge>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                    <div className="absolute bottom-2 left-3 right-3 flex items-end justify-between">
+                      <Badge className={`${cfg.color} backdrop-blur-sm`}>{cfg.label}</Badge>
+                      {album.status === "COMPLETED" && (
+                        <span className="text-[10px] text-teal-300 flex items-center gap-1 bg-black/40 rounded px-1.5 py-0.5 backdrop-blur-sm">
+                          <Download className="w-3 h-3" />Ready
+                        </span>
+                      )}
                     </div>
+                  </div>
 
+                  <CardContent className="p-4 space-y-3 flex flex-col">
                     {/* Title */}
-                    <div className="flex-1">
+                    <div>
                       <h3 className="font-semibold group-hover:text-violet-400 transition-colors line-clamp-1">
                         {album.title}
                       </h3>
                       {album.theme && (
-                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{album.theme}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{album.theme}</p>
                       )}
                     </div>
 
                     {/* Tracks progress */}
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Music2 className="w-3 h-3" />{totalTracks} tracks
@@ -107,7 +127,7 @@ export default async function AlbumsPage() {
                           </span>
                         ) : album.status === "COMPLETED" ? (
                           <span className="flex items-center gap-1 text-teal-400">
-                            <CheckCircle2 className="w-3 h-3" />{completedTracks}/{totalTracks}
+                            <CheckCircle2 className="w-3 h-3" />{completedTracks}/{totalTracks} done
                           </span>
                         ) : null}
                       </div>
@@ -122,10 +142,10 @@ export default async function AlbumsPage() {
                     </div>
 
                     {/* Meta */}
-                    <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-                      {album.genre && <span>{album.genre}</span>}
-                      {album.mood  && <><span>·</span><span>{album.mood}</span></>}
-                      <span className="ml-auto flex items-center gap-1">
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                      {album.genre && <span className="truncate">{album.genre}</span>}
+                      {album.mood  && <><span>·</span><span className="truncate">{album.mood}</span></>}
+                      <span className="ml-auto flex items-center gap-1 shrink-0">
                         <Clock className="w-3 h-3" />
                         {formatDistanceToNow(new Date(album.updatedAt), { addSuffix: true })}
                       </span>
