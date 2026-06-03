@@ -31,6 +31,7 @@ async function apiFetchLyrics(params: {
   albumTheme: string
   albumGenre: string
   albumMood: string
+  albumStyle?: string
   language: string
   targetDurationMin?: number
 }): Promise<string> {
@@ -97,6 +98,7 @@ export function AlbumTrackList({ data, onChange, onNext, onBack }: Props) {
         albumTheme:        data.theme,
         albumGenre:        data.genre,
         albumMood:         data.mood,
+        albumStyle:        [data.stylePrompt, baseTrack.stylePrompt].filter(Boolean).join(", ") || undefined,
         language:          data.language,
         targetDurationMin: perSongMin,
       })
