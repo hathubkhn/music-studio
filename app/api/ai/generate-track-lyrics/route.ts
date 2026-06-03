@@ -64,14 +64,27 @@ Return a valid JSON object:
 IMPORTANT: Return ONLY the JSON object. Keep total lyric lines between ${TARGET_LINES} and ${MAX_LINES}.`
 
     const completion = await openai.chat.completions.create({
-      model:           process.env.OPENAI_MODEL || "gpt-4o-mini",
-      messages:        [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
+      model:    process.env.OPENAI_MODEL || "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
     })
 
-    const raw  = completion.choices[0].message.content ?? "{}"
-    const parsed = JSON.parse(raw)
-    const lyrics = typeof parsed.lyrics === "string" ? parsed.lyrics : ""
+    const raw  = completion.choices[0].message.content ?? ""
+    // Extract JSON block from the response (handles markdown code fences too)
+    const jsonMatch = raw.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      // If model returned plain lyrics without JSON wrapper, use directly
+      const plainLyrics = raw.trim()
+      if (!plainLyrics) return NextResponse.json({ error: "AI returned empty lyrics" }, { status: 500 })
+      return NextResponse.json({ lyrics: plainLyrics })
+    }
+
+    let lyrics = ""
+    try {
+      const parsed = JSON.parse(jsonMatch[0])
+      lyrics = typeof parsed.lyrics === "string" ? parsed.lyrics : raw.trim()
+    } catch {
+      lyrics = raw.trim()
+    }
 
     if (!lyrics.trim()) {
       return NextResponse.json({ error: "AI returned empty lyrics" }, { status: 500 })

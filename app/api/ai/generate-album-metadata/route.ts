@@ -103,13 +103,13 @@ hashtags:
 IMPORTANT: Return ONLY the JSON object, no extra text.`
 
     const completion = await openai.chat.completions.create({
-      model:           process.env.OPENAI_MODEL || "gpt-4o-mini",
-      messages:        [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
+      model:    process.env.OPENAI_MODEL || "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
     })
 
-    const raw    = completion.choices[0].message.content ?? "{}"
-    const parsed = JSON.parse(raw)
+    const text = completion.choices[0].message.content ?? "{}"
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {}
 
     return NextResponse.json({
       youtubeTitle: parsed.youtubeTitle ?? "",

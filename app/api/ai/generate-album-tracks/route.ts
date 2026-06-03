@@ -69,12 +69,13 @@ Return a valid JSON object with exactly this shape:
 IMPORTANT: Return ONLY the JSON object above with a "tracks" key — an array of exactly ${input.numTracks} objects. No lyrics field. No extra text.`
 
     const completion = await openai.chat.completions.create({
-      model:   process.env.OPENAI_MODEL || "gpt-4o-mini",
-      messages:[{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
+      model:    process.env.OPENAI_MODEL || "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
     })
 
-    const raw = completion.choices[0].message.content ?? "{}"
+    const text = completion.choices[0].message.content ?? "{}"
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    const raw = jsonMatch ? jsonMatch[0] : "{}"
 
     let tracks: unknown[]
     try {
