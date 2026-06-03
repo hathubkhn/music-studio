@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import {
   Disc3, Music2, Play, Pause, Download, ChevronDown, ChevronUp,
   CheckCircle2, AlertCircle, Clock, Package, Film, X, Image as ImageIcon,
-  Youtube, Loader2, Copy, Check, Sparkles, RefreshCw,
+  Video, Loader2, Copy, Check, Sparkles, RefreshCw,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { LyricVideoCreator } from "@/components/create-flow/lyric-video-creator"
@@ -412,7 +412,7 @@ export function AlbumDetail({ album }: { album: Album }) {
           onClick={() => setShowYtMeta(!showYtMeta)}
           className="flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
         >
-          <Youtube className="w-4 h-4 text-red-400" />
+          <Video className="w-4 h-4 text-red-400" />
           YouTube Metadata
           {showYtMeta ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </button>
