@@ -22,13 +22,12 @@ export async function POST(req: NextRequest) {
     const body  = await req.json()
     const input = schema.parse(body)
 
-    const perSongMin = input.targetDurationMin ?? 4
+    // Suno song length is driven almost entirely by lyrics length.
+    // ~60-70 lyric lines → 4-5 min song. Keep within this range.
+    const TARGET_LINES = 65
+    const MAX_LINES    = 72
 
-    // Target line count: ~15 lines/min of music is a good approximation
-    const targetLines    = Math.max(80, perSongMin * 18)
-    const targetLineMax  = targetLines + 40
-
-    const prompt = `Write COMPLETE, FULL song lyrics for the following track. Do NOT truncate or summarise — write every single line.
+    const prompt = `Write complete song lyrics for the following track.
 
 Track: "${input.trackTitle}" (Track ${input.trackOrder})
 Description: ${input.trackDescription || "Part of the album"}
@@ -36,35 +35,33 @@ Album theme: ${input.albumTheme}
 Genre: ${input.albumGenre}
 Mood: ${input.albumMood}
 Language: ${input.language}
-Target song duration: ~${perSongMin} minutes
+Target song duration: ~4–5 minutes
 
 Requirements:
 - Lyrics MUST be written entirely in ${input.language}
-- Target length: ${targetLines}–${targetLineMax} lyric lines (excluding blank lines and section labels)
-- Use this full song structure with labels on their own line:
-  [Intro] (4–8 lines)
-  [Verse 1] (8–12 lines)
-  [Pre-Chorus] (4–6 lines)
-  [Chorus] (6–10 lines)
-  [Verse 2] (8–12 lines)
-  [Pre-Chorus] (4–6 lines)
-  [Chorus] (6–10 lines)
-  [Instrumental Break]
-  [Bridge] (6–10 lines)
-  [Chorus] (6–10 lines)
-  [Chorus] (6–10 lines, slight variation)
-  [Outro] (4–8 lines)
-- Repeat the chorus at least 3 times with slight variations each time
-- Every verse must have DIFFERENT lyrics (no copy-pasting)
-- Lyrics should be heartfelt, poetic, vivid, and fit the mood/genre
-- DO NOT add any commentary, explanation, or meta text — just the lyrics
+- Target exactly ${TARGET_LINES}–${MAX_LINES} lyric lines (count only actual lyric lines, NOT blank lines or section labels)
+- Use this song structure with labels on their own line:
+  [Intro] (4–6 lines)
+  [Verse 1] (8–10 lines)
+  [Pre-Chorus] (4 lines)
+  [Chorus] (6–8 lines)
+  [Verse 2] (8–10 lines)
+  [Pre-Chorus] (4 lines)
+  [Chorus] (6–8 lines)
+  [Bridge] (6 lines)
+  [Chorus] (6–8 lines, slight variation)
+  [Outro] (3–4 lines)
+- Repeat the chorus 3 times with slight variations
+- Verse 1 and Verse 2 must have completely different lyrics
+- Lyrics should be heartfelt, poetic, and fit the mood/genre
+- STOP after the Outro — do not add extra sections
 
 Return a valid JSON object:
 {
   "lyrics": "[Intro]\\nLine 1\\nLine 2\\n\\n[Verse 1]\\nLine 1\\n..."
 }
 
-IMPORTANT: Return ONLY the JSON object. Write the COMPLETE lyrics — do not stop early.`
+IMPORTANT: Return ONLY the JSON object. Keep total lyric lines between ${TARGET_LINES} and ${MAX_LINES}.`
 
     const completion = await openai.chat.completions.create({
       model:      process.env.OPENAI_MODEL || "gpt-4o-mini",
