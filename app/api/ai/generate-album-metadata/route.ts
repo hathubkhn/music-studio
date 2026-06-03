@@ -106,7 +106,7 @@ IMPORTANT: Return ONLY the JSON object, no extra text.`
       model:           process.env.OPENAI_MODEL || "gpt-4o-mini",
       messages:        [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
-      max_tokens:      2000,
+      max_completion_tokens: 2000,
     })
 
     const raw    = completion.choices[0].message.content ?? "{}"

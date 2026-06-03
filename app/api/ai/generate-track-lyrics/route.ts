@@ -64,10 +64,10 @@ Return a valid JSON object:
 IMPORTANT: Return ONLY the JSON object. Keep total lyric lines between ${TARGET_LINES} and ${MAX_LINES}.`
 
     const completion = await openai.chat.completions.create({
-      model:      process.env.OPENAI_MODEL || "gpt-4o-mini",
-      messages:   [{ role: "user", content: prompt }],
-      max_tokens: 4096,
-      response_format: { type: "json_object" },
+      model:                   process.env.OPENAI_MODEL || "gpt-4o-mini",
+      messages:                [{ role: "user", content: prompt }],
+      max_completion_tokens:   4096,
+      response_format:         { type: "json_object" },
     })
 
     const raw  = completion.choices[0].message.content ?? "{}"
