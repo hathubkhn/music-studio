@@ -4,9 +4,13 @@ import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Disc3, Music2, Play, Pause, Download, ChevronDown, ChevronUp,
   CheckCircle2, AlertCircle, Clock, Package, Film, X, Image as ImageIcon,
+  Youtube, Loader2, Copy, Check, Sparkles, RefreshCw,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { LyricVideoCreator } from "@/components/create-flow/lyric-video-creator"
@@ -107,6 +111,54 @@ export function AlbumDetail({ album }: { album: Album }) {
   }
 
   const [coverUrl, setCoverUrl] = useState(album.coverImageUrl ?? "")
+
+  // YouTube metadata state
+  const [showYtMeta, setShowYtMeta]     = useState(false)
+  const [ytLoading, setYtLoading]       = useState(false)
+  const [ytTitle, setYtTitle]           = useState("")
+  const [ytDesc, setYtDesc]             = useState("")
+  const [ytTags, setYtTags]             = useState("")
+  const [ytChannelUrl, setYtChannelUrl] = useState("")
+  const [copied, setCopied]             = useState<string | null>(null)
+
+  const copyText = (text: string, key: string) => {
+    navigator.clipboard.writeText(text)
+    setCopied(key)
+    setTimeout(() => setCopied(null), 2000)
+  }
+
+  const generateYtMeta = async () => {
+    setYtLoading(true)
+    try {
+      const res = await fetch("/api/ai/generate-album-metadata", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          albumTitle:  album.title,
+          theme:       album.theme,
+          genre:       album.genre,
+          mood:        album.mood,
+          language:    album.language,
+          brandName:   album.title,
+          channelUrl:  ytChannelUrl,
+          tracks:      tracks.map((t) => ({
+            order:    t.order,
+            title:    t.title,
+            duration: t.duration,
+          })),
+        }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error)
+      const data = await res.json()
+      setYtTitle(data.youtubeTitle ?? "")
+      setYtDesc(data.description  ?? "")
+      setYtTags(data.hashtags     ?? "")
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setYtLoading(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -352,6 +404,116 @@ export function AlbumDetail({ album }: { album: Album }) {
             )
           })}
         </div>
+      </div>
+
+      {/* YouTube Metadata section */}
+      <div className="space-y-3">
+        <button type="button"
+          onClick={() => setShowYtMeta(!showYtMeta)}
+          className="flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Youtube className="w-4 h-4 text-red-400" />
+          YouTube Metadata
+          {showYtMeta ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
+
+        {showYtMeta && (
+          <Card className="border-border/60">
+            <CardContent className="p-4 space-y-4">
+              {/* Channel URL input */}
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Channel URL (optional)</Label>
+                <Input
+                  value={ytChannelUrl}
+                  onChange={(e) => setYtChannelUrl(e.target.value)}
+                  placeholder="https://youtube.com/@yourchannel"
+                  className="h-8 text-xs"
+                />
+              </div>
+
+              <Button
+                variant={ytTitle ? "outline" : "gradient"}
+                size="sm"
+                disabled={ytLoading}
+                onClick={generateYtMeta}
+                className="gap-2"
+              >
+                {ytLoading
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Generating…</>
+                  : ytTitle
+                  ? <><RefreshCw className="w-3.5 h-3.5" />Regenerate</>
+                  : <><Sparkles className="w-3.5 h-3.5" />Generate YouTube Metadata</>
+                }
+              </Button>
+
+              {ytTitle && (
+                <div className="space-y-4">
+                  {/* Title */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Title</Label>
+                      <button type="button" onClick={() => copyText(ytTitle, "title")}
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                        {copied === "title" ? <Check className="w-3 h-3 text-teal-400" /> : <Copy className="w-3 h-3" />}
+                        {copied === "title" ? "Copied!" : "Copy"}
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <Input
+                        value={ytTitle}
+                        onChange={(e) => setYtTitle(e.target.value)}
+                        className="text-sm pr-2"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Description</Label>
+                      <button type="button" onClick={() => copyText(ytDesc, "desc")}
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                        {copied === "desc" ? <Check className="w-3 h-3 text-teal-400" /> : <Copy className="w-3 h-3" />}
+                        {copied === "desc" ? "Copied!" : "Copy"}
+                      </button>
+                    </div>
+                    <Textarea
+                      value={ytDesc}
+                      onChange={(e) => setYtDesc(e.target.value)}
+                      rows={14}
+                      className="text-xs font-mono resize-none"
+                    />
+                  </div>
+
+                  {/* Hashtags */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Hashtags</Label>
+                      <button type="button" onClick={() => copyText(ytTags, "tags")}
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                        {copied === "tags" ? <Check className="w-3 h-3 text-teal-400" /> : <Copy className="w-3 h-3" />}
+                        {copied === "tags" ? "Copied!" : "Copy"}
+                      </button>
+                    </div>
+                    <Textarea
+                      value={ytTags}
+                      onChange={(e) => setYtTags(e.target.value)}
+                      rows={3}
+                      className="text-xs font-mono resize-none"
+                    />
+                  </div>
+
+                  {/* Copy all */}
+                  <Button variant="outline" size="sm" className="w-full gap-2"
+                    onClick={() => copyText(`Title: ${ytTitle}\n\nDescription:\n${ytDesc}\n\nHashtags:\n${ytTags}`, "all")}>
+                    {copied === "all" ? <Check className="w-3.5 h-3.5 text-teal-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copied === "all" ? "Copied everything!" : "Copy All"}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Album Video section */}
