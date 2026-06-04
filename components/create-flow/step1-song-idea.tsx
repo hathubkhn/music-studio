@@ -138,6 +138,9 @@ export function Step1SongIdea({ data, onNext }: Props) {
           vocalStyle: formData.vocalPreference,
           durationTarget: formData.durationTarget,
           style: brief.recommendedStyle,
+          // Pass through any instructions the user may have set in a previous session
+          customPrompt: data.customPrompt || undefined,
+          chorusStyle: data.chorusStyle || undefined,
         }),
       })
       if (!lyricsRes.ok) throw new Error("Failed to generate lyrics")

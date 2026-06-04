@@ -11,6 +11,8 @@ const schema = z.object({
   vocalStyle: z.string().default("Female Vocal"),
   durationTarget: z.string().default("2 minutes"),
   style: z.string().optional(),
+  customPrompt: z.string().optional(),
+  chorusStyle: z.string().optional(),
 })
 
 export async function POST(req: NextRequest) {

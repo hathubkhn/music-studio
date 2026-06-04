@@ -42,7 +42,18 @@ export const LYRICS_GENERATION_PROMPT = (input: {
   vocalStyle: string
   durationTarget: string
   style?: string
-}) => `You are a professional songwriter and lyricist. Write complete, high-quality, original song lyrics.
+  customPrompt?: string   // user's own writing instructions
+  chorusStyle?: string    // user's chorus guidelines
+}) => {
+  const customSection = input.customPrompt?.trim()
+    ? `\n\nUSER WRITING INSTRUCTIONS (follow these carefully):\n${input.customPrompt.trim()}`
+    : ""
+
+  const chorusSection = input.chorusStyle?.trim()
+    ? `\n\nCHORUS GUIDELINES (apply to every chorus):\n${input.chorusStyle.trim()}`
+    : `\n\nCHORUS GUIDELINES:\n- Start chorus with a simple hook. Repeat the hook 2–3 times.\n- Use contrast lines: e.g. "I miss you / but I won't chase", "I loved you / but I let you go".\n- Keep chorus lines short (6–10 words) and easy to sing along to.`
+
+  return `You are a professional songwriter and lyricist. Write complete, high-quality, original song lyrics.
 
 Song concept: ${input.brief}
 Working title: ${input.title}
@@ -51,7 +62,7 @@ Mood/Energy: ${input.mood}
 Genre: ${input.genre}
 Vocal style: ${input.vocalStyle}
 Target duration: ${input.durationTarget}
-Style reference: ${input.style || "based on the concept"}
+Style reference: ${input.style || "based on the concept"}${customSection}${chorusSection}
 
 IMPORTANT REQUIREMENTS:
 - Write REAL, complete, creative lyrics — not placeholders
@@ -75,6 +86,7 @@ Respond ONLY with valid JSON (no markdown, no explanation outside JSON):
   "instrumentation": "Comma-separated list of key instruments",
   "structure": ["list", "of", "section", "names", "in", "order"]
 }`
+}
 
 export const SCENE_PROMPTS_GENERATION = (input: {
   title: string

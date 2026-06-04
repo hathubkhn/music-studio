@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useState } from "react"
 import {
   Sparkles, Loader2, ChevronLeft, Save, RotateCcw,
-  Wand2, Scissors, Star, Baby, Music2, Info
+  Wand2, Scissors, Star, Baby, Music2, Info, ChevronDown, ChevronUp, Mic2
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -34,9 +34,44 @@ const IMPROVE_ACTIONS = [
   { icon: Music2, label: "Better Rhymes", instruction: "improve the rhyming pattern while keeping the meaning" },
 ]
 
+const DEFAULT_CHORUS_STYLE =
+  `Start chorus with a simple hook. Repeat the hook 2–3 times.
+Use contrast: I miss you / but I won't chase; I loved you / but I let you go; I own the pain / and set you free.
+Keep chorus lines short (6–10 words) and memorable.`
+
+const CHORUS_PRESETS = [
+  {
+    label: "Heartbreak & Letting Go",
+    value: `Start chorus with a simple hook. Repeat the hook 2–3 times.
+Use contrast lines: "I miss you / but I won't chase", "I loved you / but I let you go", "I own the pain / and set you free".
+Keep chorus lines short (6–10 words) and memorable.`,
+  },
+  {
+    label: "Uplifting & Hope",
+    value: `Open with a soaring, hopeful hook. Repeat 2–3 times with energy.
+Use rising imagery: sunlight, open doors, new beginnings.
+End the chorus on a high note — leave the listener feeling lifted.`,
+  },
+  {
+    label: "Nostalgic & Longing",
+    value: `Start with a quiet, aching hook that references a specific memory.
+Repeat the hook with small variations each time.
+Use sensory details: a scent, a song, a place. Keep lines gentle and wistful.`,
+  },
+  {
+    label: "Empowering Anthem",
+    value: `Open with a bold declarative line. Repeat 3× with growing intensity.
+Use "I am / I will / I choose" structure.
+Make the hook feel like a rallying cry — short, punchy, impossible to forget.`,
+  },
+]
+
 export function Step2LyricsEditor({ data, onNext, onBack }: Props) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [isImproving, setIsImproving] = useState<string | null>(null)
+  const [showInstructions, setShowInstructions] = useState(false)
+  const [customPrompt, setCustomPrompt] = useState(data.customPrompt ?? "")
+  const [chorusStyle, setChorusStyle] = useState(data.chorusStyle ?? DEFAULT_CHORUS_STYLE)
   // True when lyrics arrived pre-filled from Step 1
   const hasPrefilledLyrics = Boolean(data.lyrics)
 
@@ -82,6 +117,8 @@ export function Step2LyricsEditor({ data, onNext, onBack }: Props) {
           vocalStyle: data.vocalPreference,
           durationTarget: data.durationTarget,
           style: brief?.recommendedStyle,
+          customPrompt: customPrompt.trim() || undefined,
+          chorusStyle: chorusStyle.trim() || undefined,
         }),
       })
       if (!res.ok) throw new Error()
@@ -137,6 +174,8 @@ export function Step2LyricsEditor({ data, onNext, onBack }: Props) {
       instrumentation: formData.instrumentation,
       negativePrompt: formData.negativePrompt,
       language: formData.language,
+      customPrompt,
+      chorusStyle,
     })
   }
 
@@ -169,6 +208,83 @@ export function Step2LyricsEditor({ data, onNext, onBack }: Props) {
           </CardContent>
         </Card>
       )}
+
+      {/* Lyrics writing instructions panel */}
+      <Card className="border-violet-500/30">
+        <button
+          type="button"
+          onClick={() => setShowInstructions((v) => !v)}
+          className="w-full flex items-center justify-between p-4 text-left"
+        >
+          <div className="flex items-center gap-2">
+            <Mic2 className="h-4 w-4 text-violet-400" />
+            <span className="text-sm font-medium text-violet-300">Lyrics Writing Instructions</span>
+            <span className="text-xs text-muted-foreground ml-1">(optional — guide AI on style, tone, structure)</span>
+          </div>
+          {showInstructions
+            ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          }
+        </button>
+
+        {showInstructions && (
+          <CardContent className="pt-0 space-y-5 border-t border-border/40">
+            {/* Custom writing prompt */}
+            <div className="space-y-2 pt-4">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Writing Style Prompt
+              </Label>
+              <Textarea
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                rows={3}
+                className="text-sm resize-none bg-background/60"
+                placeholder={`e.g. Write simple but powerful heartbreak lyrics about regret and letting go. Use short singable lines, direct emotions, strong chorus hook, and avoid overly poetic language.`}
+              />
+              <p className="text-xs text-muted-foreground">
+                Describe the emotional tone, lyric style, or specific writing rules you want the AI to follow.
+              </p>
+            </div>
+
+            {/* Chorus style */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Chorus Guidelines
+                </Label>
+                <span className="text-xs text-muted-foreground">or pick a preset →</span>
+              </div>
+              {/* Preset chips */}
+              <div className="flex flex-wrap gap-2">
+                {CHORUS_PRESETS.map((p) => (
+                  <button
+                    key={p.label}
+                    type="button"
+                    onClick={() => setChorusStyle(p.value)}
+                    className={`px-2.5 py-1 text-xs rounded-full border transition-all ${
+                      chorusStyle === p.value
+                        ? "border-violet-500/50 bg-violet-500/15 text-violet-300"
+                        : "border-border/60 text-muted-foreground hover:border-violet-500/30 hover:text-violet-300"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              <Textarea
+                value={chorusStyle}
+                onChange={(e) => setChorusStyle(e.target.value)}
+                rows={4}
+                className="text-xs font-mono resize-none bg-background/60"
+                placeholder="Describe how the chorus should be structured, how many times it repeats, what emotional contrast it should use…"
+              />
+              <p className="text-xs text-muted-foreground">
+                These guidelines are injected directly into the AI prompt for every generation and regeneration.
+              </p>
+            </div>
+          </CardContent>
+        )}
+      </Card>
 
       {/* Success banner when lyrics arrived from Step 1 */}
       {hasPrefilledLyrics && (

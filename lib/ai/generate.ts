@@ -224,11 +224,11 @@ export async function generateLyrics(input: Parameters<typeof LYRICS_GENERATION_
       },
       { role: "user", content: prompt },
     ],
-    response_format: { type: "json_object" },
     temperature: 0.92,
   })
   const raw = response.choices[0]?.message?.content || "{}"
-  return JSON.parse(raw)
+  const jsonMatch = raw.match(/\{[\s\S]*\}/)
+  return JSON.parse(jsonMatch ? jsonMatch[0] : raw)
 }
 
 export async function generateScenePrompts(input: Parameters<typeof SCENE_PROMPTS_GENERATION>[0]) {

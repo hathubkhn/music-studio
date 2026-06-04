@@ -75,6 +75,9 @@ export type ProjectData = {
   // Kie track-level IDs (needed for replace-section / language translate)
   musicAudioId?: string    // individual track ID within the generation task
   musicDuration?: number   // track duration in seconds
+  // Lyrics writing instructions
+  customPrompt?: string    // user's own lyric writing instructions
+  chorusStyle?: string     // user's chorus-specific guidelines
 }
 
 export type SceneData = {
