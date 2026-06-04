@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db"
+import { getOrCreateUserId } from "@/lib/user"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -22,7 +23,7 @@ const STATUS_CFG = {
 }
 
 export default async function AlbumsPage() {
-  const userId = await getOrCreateUser()
+  const userId = await getOrCreateUserId()
   const albums = await prisma.album.findMany({
     where:   { userId },
     orderBy: { updatedAt: "desc" },

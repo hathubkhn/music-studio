@@ -1,16 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { prisma } from "@/lib/db"
-
-async function getOrCreateUser() {
-  const email = "default@musicstudio.local"
-  const user = await prisma.user.upsert({
-    where:  { email },
-    create: { email, name: "Default User" },
-    update: {},
-  })
-  return user.id
-}
+import { getOrCreateUserId } from "@/lib/user"
 
 const createSchema = z.object({
   title:       z.string(),
@@ -30,7 +22,7 @@ const createSchema = z.object({
 
 export async function GET() {
   try {
-    const userId = await getOrCreateUser()
+    const userId = await getOrCreateUserId()
     const albums = await prisma.album.findMany({
       where:   { userId },
       orderBy: { updatedAt: "desc" },
@@ -48,7 +40,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const userId = await getOrCreateUser()
+    const userId = await getOrCreateUserId()
     const body   = await req.json()
     const input  = createSchema.parse(body)
 
@@ -77,10 +69,13 @@ export async function POST(req: NextRequest) {
       },
       include: { tracks: { orderBy: { order: "asc" } } },
     })
+    revalidatePath("/albums")
+    revalidatePath(`/albums/${album.id}`)
+
     return NextResponse.json(album, { status: 201 })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to create album"
-    console.error("[Albums POST]", message)
+    console.error("[Albums POST]", message, error)
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

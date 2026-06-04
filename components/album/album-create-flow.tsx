@@ -1,12 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { AlbumSetup } from "./step1-album-setup"
 import { AlbumTrackList } from "./step2-track-list"
 import { AlbumGenerate } from "./step3-generate-tracks"
 import { Disc3, ListMusic, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { persistAlbum } from "@/lib/album-save"
+import { toast } from "sonner"
 
 export type AlbumTrack = {
   id?: string           // set after saving to DB
@@ -47,6 +49,7 @@ const STEPS = [
 export function AlbumCreateFlow() {
   const router = useRouter()
   const [stepIndex, setStepIndex] = useState(0)
+  const [isSavingDraft, setIsSavingDraft] = useState(false)
   const [album, setAlbum] = useState<AlbumData>({
     title: "",
     theme: "",
@@ -68,6 +71,31 @@ export function AlbumCreateFlow() {
 
   const goNext = () => setStepIndex((i) => Math.min(i + 1, STEPS.length - 1))
   const goPrev = () => setStepIndex((i) => Math.max(i - 1, 0))
+
+  /** Save draft to DB before step 3 so the album appears in the Albums tab. */
+  const goToGenerate = useCallback(async () => {
+    if (album.tracks.length < 2) {
+      toast.error("Add at least 2 tracks before continuing")
+      return
+    }
+    setIsSavingDraft(true)
+    try {
+      const saved = await persistAlbum(album)
+      setAlbum((prev) => ({
+        ...prev,
+        id: saved.id,
+        tracks: prev.tracks.map((t, i) => ({
+          ...t,
+          id: saved.tracks[i]?.id ?? t.id,
+        })),
+      }))
+      setStepIndex(2)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save album")
+    } finally {
+      setIsSavingDraft(false)
+    }
+  }, [album])
 
   const currentStep = STEPS[stepIndex].key
 
@@ -125,8 +153,9 @@ export function AlbumCreateFlow() {
         <AlbumTrackList
           data={album}
           onChange={updateAlbum}
-          onNext={goNext}
+          onNext={goToGenerate}
           onBack={goPrev}
+          isSavingNext={isSavingDraft}
         />
       )}
       {currentStep === "generate" && (
@@ -134,7 +163,10 @@ export function AlbumCreateFlow() {
           data={album}
           onChange={updateAlbum}
           onBack={goPrev}
-          onFinish={(albumId) => router.push(`/albums/${albumId}`)}
+          onFinish={(albumId) => {
+            router.push(`/albums/${albumId}`)
+            router.refresh()
+          }}
         />
       )}
     </div>

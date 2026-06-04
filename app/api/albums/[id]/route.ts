@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { prisma } from "@/lib/db"
 
@@ -27,6 +28,14 @@ const patchSchema = z.object({
   stylePrompt: z.string().optional(),
   status:      z.enum(["DRAFT", "GENERATING", "COMPLETED"]).optional(),
   coverImageUrl: z.string().optional(),
+  // Replace full track list (draft save from create flow)
+  tracks: z.array(z.object({
+    order:       z.number(),
+    title:       z.string(),
+    description: z.string().optional(),
+    lyrics:      z.string().optional(),
+    stylePrompt: z.string().optional(),
+  })).optional(),
   // Patch a single track
   track: z.object({
     id:           z.string(),
@@ -59,6 +68,24 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     const album = await prisma.album.update({ where: { id }, data: albumData })
 
+    // Sync full track list (used when saving draft before music generation)
+    if (input.tracks?.length) {
+      await prisma.$transaction([
+        prisma.albumTrack.deleteMany({ where: { albumId: id } }),
+        prisma.albumTrack.createMany({
+          data: input.tracks.map((t) => ({
+            albumId:     id,
+            order:       t.order,
+            title:       t.title,
+            description: t.description,
+            lyrics:      t.lyrics,
+            stylePrompt: t.stylePrompt,
+            status:      "PENDING",
+          })),
+        }),
+      ])
+    }
+
     // Update single track if provided
     if (input.track) {
       const trackData: Record<string, unknown> = {}
@@ -84,10 +111,18 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       await prisma.album.update({ where: { id }, data: { status: "GENERATING" } })
     }
 
-    return NextResponse.json(album)
+    const updated = await prisma.album.findUnique({
+      where:   { id },
+      include: { tracks: { orderBy: { order: "asc" } } },
+    })
+
+    revalidatePath("/albums")
+    revalidatePath(`/albums/${id}`)
+
+    return NextResponse.json(updated ?? album)
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to update album"
-    console.error("[Album PATCH]", message)
+    console.error("[Album PATCH]", message, error)
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

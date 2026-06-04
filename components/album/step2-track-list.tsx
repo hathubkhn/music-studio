@@ -18,8 +18,9 @@ import type { AlbumData, AlbumTrack } from "./album-create-flow"
 interface Props {
   data: AlbumData
   onChange: (patch: Partial<AlbumData>) => void
-  onNext: () => void
+  onNext: () => void | Promise<void>
   onBack: () => void
+  isSavingNext?: boolean
 }
 
 type LyricsState = "pending" | "generating" | "done" | "failed"
@@ -45,7 +46,7 @@ async function apiFetchLyrics(params: {
   return lyrics as string
 }
 
-export function AlbumTrackList({ data, onChange, onNext, onBack }: Props) {
+export function AlbumTrackList({ data, onChange, onNext, onBack, isSavingNext }: Props) {
   // Tracks live here; we push to parent on every meaningful update
   const [tracks, setTracksState] = useState<AlbumTrack[]>(data.tracks)
   // Ref so parallel async functions can always read the latest version
@@ -418,9 +419,16 @@ export function AlbumTrackList({ data, onChange, onNext, onBack }: Props) {
         <Button variant="outline" onClick={onBack} disabled={isGeneratingMeta || isWritingLyrics} className="gap-2">
           <ArrowLeft className="w-4 h-4" />Back
         </Button>
-        <Button variant="gradient" onClick={onNext} disabled={!canContinue} className="gap-2">
-          Start Generating Music
-          <ArrowRight className="w-4 h-4" />
+        <Button
+          variant="gradient"
+          onClick={() => void onNext()}
+          disabled={!canContinue || isSavingNext || isWritingLyrics}
+          className="gap-2"
+        >
+          {isSavingNext
+            ? <><Loader2 className="w-4 h-4 animate-spin" />Saving album…</>
+            : <>Start Generating Music<ArrowRight className="w-4 h-4" /></>
+          }
         </Button>
       </div>
     </div>

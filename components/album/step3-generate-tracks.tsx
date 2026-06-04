@@ -17,6 +17,7 @@ import { toast } from "sonner"
 import type { AlbumData, AlbumTrack } from "./album-create-flow"
 import { generateTrackImage } from "@/lib/composite-track-image"
 import { generateAlbumThumbnail } from "@/lib/generate-album-thumbnail"
+import { persistAlbum } from "@/lib/album-save"
 
 interface Props {
   data: AlbumData
@@ -48,7 +49,7 @@ function buildDefaultThumbPrompt(data: AlbumData): string {
 
 export function AlbumGenerate({ data, onChange, onBack, onFinish }: Props) {
   const router = useRouter()
-  const [albumId, setAlbumId]     = useState<string | null>(null)
+  const [albumId, setAlbumId]     = useState<string | null>(data.id ?? null)
   const [isSaving, setIsSaving]   = useState(false)
   const [isStarted, setIsStarted] = useState(false)
   const [countdown, setCountdown] = useState<number | null>(null)
@@ -70,41 +71,20 @@ export function AlbumGenerate({ data, onChange, onBack, onFinish }: Props) {
   const totalProgress  = Math.round((completedCount / data.tracks.length) * 100)
   const allDone        = completedCount + failedCount === data.tracks.length && isStarted
 
-  // ── Save album to DB ──────────────────────────────────────────────────────
+  // ── Save / sync album to DB ───────────────────────────────────────────────
   const saveAlbum = useCallback(async () => {
     if (albumId) return albumId
     setIsSaving(true)
     try {
-      const res = await fetch("/api/albums", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title:       data.title,
-          theme:       data.theme,
-          genre:       data.genre,
-          mood:        data.mood,
-          language:    data.language,
-          stylePrompt: data.stylePrompt,
-          tracks:      data.tracks.map((t) => ({
-            order:       t.order,
-            title:       t.title,
-            description: t.description,
-            lyrics:      t.lyrics,
-            stylePrompt: t.stylePrompt,
-          })),
-        }),
-      })
-      if (!res.ok) throw new Error()
-      const album = await res.json()
-      setAlbumId(album.id)
-      // Store track DB IDs
+      const saved = await persistAlbum(data)
+      setAlbumId(saved.id)
       onChange({
-        id: album.id,
-        tracks: data.tracks.map((t, i) => ({ ...t, id: album.tracks[i]?.id })),
+        id: saved.id,
+        tracks: data.tracks.map((t, i) => ({ ...t, id: saved.tracks[i]?.id ?? t.id })),
       })
-      return album.id as string
-    } catch {
-      toast.error("Failed to save album to database")
+      return saved.id
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save album to database")
       return null
     } finally {
       setIsSaving(false)
@@ -240,6 +220,12 @@ export function AlbumGenerate({ data, onChange, onBack, onFinish }: Props) {
     setIsStarted(true)
     const aid = await saveAlbum()
     if (!aid) return
+
+    await fetch(`/api/albums/${aid}`, {
+      method:  "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ status: "GENERATING" }),
+    })
 
     const albumRes = await fetch(`/api/albums/${aid}`)
     const albumDB  = await albumRes.json()
