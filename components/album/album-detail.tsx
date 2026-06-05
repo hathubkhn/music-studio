@@ -17,6 +17,8 @@ import { LyricVideoCreator } from "@/components/create-flow/lyric-video-creator"
 import { TrackImageEditor }  from "./track-image-editor"
 import { AlbumVideoCreator } from "./album-video-creator"
 import { DEFAULT_VIDEO_CONFIG } from "./album-video-utils"
+import { PlaylistScoringPanel } from "@/components/song-scoring/playlist-scoring-panel"
+import type { GeneratedSong, ScoringContext } from "@/lib/song-scoring/types"
 
 type Track = {
   id:           string
@@ -65,6 +67,7 @@ export function AlbumDetail({ album }: { album: Album }) {
   const [videoTrackId, setVideoTrackId] = useState<string | null>(null)
   const [playingTrackId, setPlaying]    = useState<string | null>(null)
   const [showAlbumVideo, setShowAlbumVideo] = useState(false)
+  const [showScoring, setShowScoring]       = useState(false)
   const audioEls = useRef<Map<string, HTMLAudioElement>>(new Map())
 
   const completedTracks = tracks.filter((t) => t.status === "COMPLETED")
@@ -515,6 +518,47 @@ export function AlbumDetail({ album }: { album: Album }) {
           </Card>
         )}
       </div>
+
+      {/* Song Scoring section */}
+      {tracks.length > 0 && (
+        <div className="space-y-3">
+          <button type="button"
+            onClick={() => setShowScoring(!showScoring)}
+            className="flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <span className="text-violet-400">★</span>
+            Song Scoring & Publishing Priority
+            {showScoring ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+
+          {showScoring && (() => {
+            const scoringSongs: GeneratedSong[] = tracks.map((t) => ({
+              id: t.id,
+              title: t.title,
+              topic: album.theme || album.title,
+              genre: album.genre || "Pop",
+              mood: album.mood || "Emotional",
+              stylePrompt: t.stylePrompt || album.stylePrompt || undefined,
+              lyrics: t.lyrics || "",
+              description: t.description || undefined,
+              createdAt: new Date().toISOString(),
+            }))
+            const scoringContext: ScoringContext = {
+              playlistTopic: album.theme || album.title,
+              genre: album.genre || "Pop",
+              mood: album.mood || "Emotional",
+              targetPlatform: "youtube",
+            }
+            return (
+              <PlaylistScoringPanel
+                songs={scoringSongs}
+                context={scoringContext}
+                playlistId={album.id}
+              />
+            )
+          })()}
+        </div>
+      )}
 
       {/* Album Video section */}
       {completedTracks.length > 0 && (

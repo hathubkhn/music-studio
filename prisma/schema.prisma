@@ -240,6 +240,29 @@ enum SceneStatus {
   FAILED
 }
 
+// ── Song Scoring ─────────────────────────────────────────────────────────────
+
+model SongScore {
+  id           String   @id @default(cuid())
+  // Reference to either an AlbumTrack or Project (loose foreign key — no cascade so scores survive deletions)
+  songId       String
+  songType     String   @default("album_track") // "album_track" | "project"
+  albumId      String?
+  totalScore   Float
+  rank         Int      @default(0)
+  recommendation String  // publish_first | publish_early | publish_later | needs_revision
+  bestUseCase  String   // long_form_youtube | youtube_shorts | tiktok_clip | playlist_track | needs_rewrite
+  categoryScores Json
+  strengths    Json     @default("[]")
+  weaknesses   Json     @default("[]")
+  suggestedImprovements Json @default("[]")
+  suggestedPublishingOrderReason String? @db.Text
+  scoringContext Json
+  scoringMode  String   @default("rule_based") // "rule_based" | "llm"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 model CostEvent {
   id            String   @id @default(cuid())
   projectId     String
